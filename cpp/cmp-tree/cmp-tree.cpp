@@ -1,7 +1,6 @@
 /* C++ includes */
 #include <algorithm>
 #include <array>
-#include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <tuple>
@@ -59,7 +58,7 @@ std::vector<fs::path> relative_files_in_tree( \
 		closedir(dir);
 	/* If we are NOT able to open the directory successfully */
 	} else {
-		std::cout << "Was not able to open the directory" << std::endl;
+		std::cout << "Was not able to open the directory\n";
 	}
 
 	return ret;
@@ -93,27 +92,27 @@ std::vector<fs::path> files_in_tree(fs::path &root) {
  * \return a file path that points to the second file we wish to
  *     compare.
  */
-std::tuple<bool, fs::file_type, fs::file_type> compare_path( \
-	fs::path &first_path, fs::path &second_path) {
+std::tuple<bool, fs::file_type, fs::file_type> \
+compare_path( \
+	fs::path &first_path, \
+	fs::path &second_path) {
 
 	/* Get the file types for both files */
-	/* fs::file_type first_file_type = \ */
-	/* 	fs::status(first_path).type(); */
-	/* fs::file_type second_file_type = \ */
-	/* 	fs::status(second_path).type(); */
+	fs::file_type first_file_type = \
+		fs::status(first_path).type();
+	fs::file_type second_file_type = \
+		fs::status(second_path).type();
 
 	/* Initialize the return tuple */
-	/* std::tuple<bool, fs::file_type, fs::file_type> \ */
-	/* 	ret = std::make_tuple(false, first_file_type, second_file_type); */
 	std::tuple<bool, fs::file_type, fs::file_type> \
-		ret = std::make_tuple(false, fs::file_type::regular, fs::file_type::regular);
+		ret = std::make_tuple(false, first_file_type, second_file_type);
 
 	/* If the two paths point to files that are of different types (e.g. a
 	 * directory vs. a symlink, a fifo vs a regular file) then return early,
 	 * with the match member set to false */
-	/* if (first_file_type != second_file_type) { */
-	/* 	return ret; */
-	/* } */
+	if (first_file_type != second_file_type) {
+		return ret;
+	}
 
 	pid_t child_pid = fork();
 
@@ -156,7 +155,9 @@ std::tuple<bool, fs::file_type, fs::file_type> compare_path( \
  *     directory, 1 if it does not.
  */
 std::vector<std::tuple<std::tuple<bool, fs::file_type, fs::file_type>, fs::path, fs::path>>
-compare_directory_trees( fs::path &first_root, fs::path &second_root) {
+compare_directory_trees( \
+	fs::path &first_root, \
+	fs::path &second_root) {
 
 	std::vector<std::tuple<std::tuple<bool, fs::file_type, fs::file_type>, fs::path, fs::path>> ret;
 	/* Get the first directory file list and the second directory file list:
@@ -192,7 +193,7 @@ compare_directory_trees( fs::path &first_root, fs::path &second_root) {
 
 int main(int argc, char **argv) {
 	if (argc != 3) {
-		std::cout << "Expected 2 arguments, received " << argc - 1 << std::endl;
+		std::cout << "Expected 2 arguments, received " << argc - 1 << "\n";
 	}
 
 	fs::path first_path(argv[1]);
@@ -209,13 +210,13 @@ int main(int argc, char **argv) {
 		* that exists... */
 		if (!fs::exists(e)) {
 			std::cout << "Provided directory (" << e << \
-				") does not exist. Exiting..." << std::endl;
+				") does not exist. Exiting...\n";
 			return -1;
 		} else {
 			/* ... and that it points to a directory */
 			if (!fs::is_directory(e)) {
 				std::cout << "Provided directory (" << e << \
-					") is not a directory. Exiting..." << std::endl;
+					") is not a directory. Exiting...\n";
 				return -1;
 			}
 		}
