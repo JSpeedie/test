@@ -48,8 +48,8 @@ String *path_extend(String *root, String *extension) {
 }
 
 
-/** Returns an int represent whether the given file path points to a directory
- * or not.
+/** Returns an int representing whether the given file path points to a
+ * directory or not.
 
  * \param '*file_path' the file path to the (possible) directory to be checked.
  * \return negative int if there was an error, 0 if the file path leads to a
@@ -74,13 +74,16 @@ int is_dir(char *file_path) {
 }
 
 
-// TODO:
-/** Returns an int represent whether the given file path points to a directory
- * or not.
+/** Returns an int representing the mode (or type) of the file pointed to by
+ * the file path '*file_path'.
 
- * \param '*file_path' the file path to the (possible) directory to be checked.
- * \return negative int if there was an error, 0 if the file path leads to a
- *     directory, 1 if it does not.
+ * \param '*file_path' a file path which points to the file we wish to get the
+ *     file mode of.
+ * \param '*ret' a return variable which (on success) will be modified to contain
+ *     an unsigned integer representing the mode (or type) of the file. This
+ *     value can be compared to the 'S_IFDIR', 'S_IFREG', etc. constants
+ *     provided by <sys/stat.h> to confirm which type the file is.
+ * \return negative int if there was an error, 0 on success.
  */
 int get_file_mode(char *file_path, unsigned int *ret) {
 	/* {{{ */
