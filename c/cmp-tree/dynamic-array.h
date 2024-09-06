@@ -55,6 +55,7 @@ int dynamic_array_concat(DynamicArray *target, DynamicArray *extra);
 void dynamic_array_slice_init(DynamicArraySlice *slice, DynamicArray *da, \
 	size_t start, size_t finish);
 int dynamic_array_sort(DynamicArray *da);
+int dynamic_array_unique(DynamicArray *da);
 void dynamic_array_destroy(DynamicArray *da);
 
 #endif

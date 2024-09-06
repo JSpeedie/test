@@ -217,7 +217,6 @@ int _dynamic_array_merge_sort(DynamicArraySlice *slice) {
 	} else if (slice_len == 2) {
 		void ** slice_da_arr = slice->da->array;
 		/* If they are already in non-decreasing order */
-		// TODO: some problem with this function call
 		if (0 >= slice->da->compare_function(slice_da_arr[slice->start], \
 			slice_da_arr[slice->end]) ) {
 
@@ -236,9 +235,9 @@ int _dynamic_array_merge_sort(DynamicArraySlice *slice) {
 		DynamicArraySlice first_half;
 		DynamicArraySlice second_half;
 		dynamic_array_slice_init(&first_half, slice->da, \
-			slice->start, slice->start + (slice_len / 2));
+			slice->start, slice->start + (slice_len / 2) - 1);
 		dynamic_array_slice_init(&second_half, slice->da, \
-			slice->start + (slice_len / 2) + 1, slice->end);
+			slice->start + (slice_len / 2), slice->end);
 		_dynamic_array_merge_sort(&first_half);
 		_dynamic_array_merge_sort(&second_half);
 
@@ -252,21 +251,24 @@ int _dynamic_array_merge_sort(DynamicArraySlice *slice) {
 		/* Zip together the two sorted sections into a temporary array */
 		for (int i = 0; i < slice_len; i++) {
 			if (r >= slice_len) {
-				temp[i] = slice_da_arr[l];
+				temp[i] = slice_da_arr[slice->start + l];
 				l++;
 				continue;
 			}
 			if (l >= slice_len / 2) {
-				temp[i] = slice_da_arr[r];
+				temp[i] = slice_da_arr[slice->start + r];
 				r++;
 				continue;
 			}
 			/* If slice_da_arr[l] <= slice_da_arr[r] */
-			if (0 >= slice->da->compare_function(slice_da_arr[l], slice_da_arr[r])) {
-				temp[i] = slice_da_arr[l];
+			if (0 >= slice->da->compare_function( \
+					slice_da_arr[slice->start + l], \
+					slice_da_arr[slice->start + r])) {
+
+				temp[i] = slice_da_arr[slice->start + l];
 				l++;
 			} else {
-				temp[i] = slice_da_arr[r];
+				temp[i] = slice_da_arr[slice->start + r];
 				r++;
 			}
 		}
@@ -274,7 +276,7 @@ int _dynamic_array_merge_sort(DynamicArraySlice *slice) {
 		/* Copy the contents of the sorted temporary array to the original
 		 * array */
 		for (int i = 0; i < slice_len; i++) {
-			slice_da_arr[i] = temp[i];
+			slice_da_arr[slice->start + i] = temp[i];
 		}
 		
 		return 0;
@@ -296,6 +298,63 @@ int dynamic_array_sort(DynamicArray *da) {
 	dynamic_array_slice_init(&slice, da, 0, da->length - 1);
 
 	return _dynamic_array_merge_sort(&slice);
+	/* }}} */
+}
+
+
+/** Takes a dynamic array and removes duplicate adjacent elements.
+ *
+ * \param '*da' a pointer to a DynamicArray representing the dynamic array
+ *     which will be have duplicate adjacent elements removed.
+ * \return 0 if the dynamic array successfully had its duplicate adjacent
+ *     elements removed, and -1 if there was an error.
+ */
+int dynamic_array_unique(DynamicArray *da) {
+	/* {{{ */
+	if (da->length <= 1) return 0;
+
+	char keep[da->length];
+	// Always keep the first element
+	keep[0] = 1;
+	size_t keep_count = 1;
+	void * adjacent = da->array[0];
+
+	for (int i = 1; i < da->length; i++) {
+		/* If the current element is equal to its adjacent element */
+		if (0 == da->compare_function(da->array[i], adjacent) ) {
+			/* Then it is a duplicate adjacent element. Don't keep it */
+			keep[i] = 0;
+			// No need to update the adjacent element if we the current one
+			// was a duplicate - just reuse the adjacent element again.
+		} else {
+			keep[i] = 1;
+			keep_count++;
+			adjacent = da->array[i];
+		}
+	}
+
+	/* Shimmy all the elements-to-keep to the front of the array */
+	size_t jump = 0;
+	for (int i = 1; i < da->length; i++) {
+		if (keep[i] == 0) {
+			jump++;
+		} else {
+			da->array[i - jump] = da->array[i];
+		}
+	}
+
+	/* Chop the length of the array at the end of the last shimmied element */
+	da->length = keep_count;
+
+	/* Shrink the array if the unique version of it is more than
+	 * (2n + 1) times smaller than the arrays current capacity */
+	if ((2 * keep_count) + 1 < da->capacity) {
+		da->capacity = (2 * keep_count) + 1; /* 2n + 1 resizing */
+		da->array = realloc(da->array, sizeof(void *) * da->capacity);
+		if (da->array == NULL) return -1;
+	}
+
+	return 0;
 	/* }}} */
 }
 
