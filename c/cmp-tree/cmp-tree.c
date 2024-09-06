@@ -112,23 +112,35 @@ int str_eq(char *s1, char *s2) {
 
 String *path_extend(String *root, String *extension) {
 	/* {{{ */
-	String *ret;
+	String *ret = malloc(sizeof(String));
 
+	/* If the root is empty, return a copy of '*extension' */
 	if (0 == root->length) {
-		ret = malloc(extension->capacity);
-		memcpy(ret->data, extension->data, extension->capacity);
+		duplicate_string(ret, extension);
 		return ret;
 	}
 
+	/* If the extension is empty, return a copy of '*root' */
+	if (0 == extension->length) {
+		duplicate_string(ret, root);
+		return ret;
+	}
+
+	/* Return the extended path, inserting a '/' if '*root' does not already
+	 * include one */
 	if (root->data[root->length] == '/') {
-		ret = malloc(root->length + extension->length + 1);
+		ret->data = malloc(root->length + extension->length + 1);
+		ret->capacity = root->length + extension->length + 1;
 		memcpy(&ret->data[0], root->data, root->length);
 		memcpy(&ret->data[root->length], extension->data, extension->capacity);
+		ret->length = strlen(ret->data);
 	} else {
-		ret = malloc(root->length + extension->length + 2);
+		ret->data = malloc(root->length + extension->length + 2);
+		ret->capacity = root->length + extension->length + 2;
 		memcpy(&ret->data[0], root->data, root->length);
 		ret->data[root->length] = '/';
-		memcpy(&ret->data[root->length], extension->data, extension->capacity);
+		memcpy(&ret->data[root->length + 1], extension->data, extension->capacity);
+		ret->length = strlen(ret->data);
 	}
 
 	return ret;
@@ -200,6 +212,7 @@ int get_file_mode(char *file_path, unsigned int *ret) {
  */
 DynamicArray relative_files_in_tree(String *root, String *extension) {
 	/* {{{ */
+	/* DynamicArray<String> */
 	DynamicArray ret;
 	dynamic_array_init(&ret, 2, &copy_function_String, \
 		&compare_function_String, &destroy_function_String);
@@ -214,13 +227,15 @@ DynamicArray relative_files_in_tree(String *root, String *extension) {
 			create_string_in_place(&file_name, dir_entry->d_name);
 			/* Only includes files that are not the special "." and ".."
 			 * entries */
-			if (0 != str_eq(file_name.data, ".") && 0 != str_eq(file_name.data, "..")) {
+			if (0 != str_eq(file_name.data, ".") \
+					&& 0 != str_eq(file_name.data, "..")) {
+
 				String *file_fp = path_extend(dir_path, &file_name);
 				String *file_rp = path_extend(extension, &file_name);
 				dynamic_array_push(&ret, file_rp);
 
 				/* If the current element is a directory... */
-				if (is_dir(file_fp->data)) {
+				if (0 == is_dir(file_fp->data)) {
 					/* Recurse and append the sub directory relative file
 					 * paths */
 					DynamicArray sub_ret = relative_files_in_tree(root, file_rp);
@@ -231,7 +246,8 @@ DynamicArray relative_files_in_tree(String *root, String *extension) {
 		closedir(dir);
 	/* If we are NOT able to open the directory successfully */
 	} else {
-		fprintf(stderr, "Was not able to open the directory\n");
+		fprintf(stderr, "Was not able to open the directory \"%s\"\n", \
+			dir_path->data);
 	}
 
 	return ret;
@@ -347,12 +363,13 @@ DynamicArray compare_directory_trees(String *first_root, \
 		&compare_function_String, &destroy_function_String);
 	dynamic_array_concat(&combined_ft, &first_ft);
 	dynamic_array_concat(&combined_ft, &second_ft);
-	// // TODO: sort the combined file tree list, then remove non-unique elements
-	// /* Sort the combined file tree and remove duplicate items */
-	// std::sort(combined_ft.begin(), combined_ft.end());
-	// auto last = std::unique(combined_ft.begin(), combined_ft.end());
-	// combined_ft.erase(last, combined_ft.end());
 
+	/* Sort the combined file tree and remove duplicate items */
+	dynamic_array_sort(&combined_ft);
+	/* Remove adjacent duplicate items in the dynamic array */
+	dynamic_array_unique(&combined_ft);
+
+	// TODO:
 	// /* Go through all the files in the combined  file list, create two full
 	//  * paths to the file, one rooted at '&first_root', one rooted at
 	//  * '&second_root', and compare them */
@@ -403,41 +420,89 @@ int main(int argc, char **argv) {
 	// 		<< std::get<2>(e) << "\n";
 	// }
 
-	DynamicArray test;
-	dynamic_array_init(&test, 2, &copy_function_String, \
+
+
+
+
+	/* DynamicArray<String> */
+	DynamicArray first_ft = files_in_tree(first_path);
+	DynamicArray second_ft = files_in_tree(second_path);
+
+	/* DynamicArray<String> */
+	DynamicArray combined_ft;
+	dynamic_array_init(&combined_ft, 2, &copy_function_String, \
 		&compare_function_String, &destroy_function_String);
-	String *test_string = create_string("firsttest");
-	dynamic_array_push(&test, test_string);
+	dynamic_array_concat(&combined_ft, &first_ft);
+	dynamic_array_concat(&combined_ft, &second_ft);
 
+	printf("COMBINED FILE TREE =====================================\n");
 	/* Print the contents of the dynamic array */
 	printf("[ ");
-	for (int i = 0; i < test.length; i++) {
-		printf("\"%s\"", ((String *) test.array[i])->data);
-		if (i < test.length - 1) printf(", ");
+	for (int i = 0; i < combined_ft.length; i++) {
+		printf("\"%s\"", ((String *) combined_ft.array[i])->data);
+		if (i < combined_ft.length - 1) printf(", ");
 	}
 	printf(" ]\n");
 
-	destroy_string(test_string);
-	free(test_string);
-	test_string = create_string("anotherstring");
-	dynamic_array_push(&test, test_string);
+	dynamic_array_sort(&combined_ft);
 
+	printf("COMBINED FILE TREE SORTED ==============================\n");
 	/* Print the contents of the dynamic array */
 	printf("[ ");
-	for (int i = 0; i < test.length; i++) {
-		printf("\"%s\"", ((String *) test.array[i])->data);
-		if (i < test.length - 1) printf(", ");
+	for (int i = 0; i < combined_ft.length; i++) {
+		printf("\"%s\"", ((String *) combined_ft.array[i])->data);
+		if (i < combined_ft.length - 1) printf(", ");
 	}
 	printf(" ]\n");
 
-	/* Sort the array */
-	dynamic_array_sort(&test);
+	dynamic_array_unique(&combined_ft);
 
+	printf("COMBINED FILE TREE UNIQUE ==============================\n");
 	/* Print the contents of the dynamic array */
 	printf("[ ");
-	for (int i = 0; i < test.length; i++) {
-		printf("\"%s\"", ((String *) test.array[i])->data);
-		if (i < test.length - 1) printf(", ");
+	for (int i = 0; i < combined_ft.length; i++) {
+		printf("\"%s\"", ((String *) combined_ft.array[i])->data);
+		if (i < combined_ft.length - 1) printf(", ");
 	}
 	printf(" ]\n");
+
+
+
+	/* DynamicArray test; */
+	/* dynamic_array_init(&test, 2, &copy_function_String, \ */
+	/* 	&compare_function_String, &destroy_function_String); */
+	/* String *test_string = create_string("firsttest"); */
+	/* dynamic_array_push(&test, test_string); */
+
+	/* /1* Print the contents of the dynamic array *1/ */
+	/* printf("[ "); */
+	/* for (int i = 0; i < test.length; i++) { */
+	/* 	printf("\"%s\"", ((String *) test.array[i])->data); */
+	/* 	if (i < test.length - 1) printf(", "); */
+	/* } */
+	/* printf(" ]\n"); */
+
+	/* destroy_string(test_string); */
+	/* free(test_string); */
+	/* test_string = create_string("anotherstring"); */
+	/* dynamic_array_push(&test, test_string); */
+
+	/* /1* Print the contents of the dynamic array *1/ */
+	/* printf("[ "); */
+	/* for (int i = 0; i < test.length; i++) { */
+	/* 	printf("\"%s\"", ((String *) test.array[i])->data); */
+	/* 	if (i < test.length - 1) printf(", "); */
+	/* } */
+	/* printf(" ]\n"); */
+
+	/* /1* Sort the array *1/ */
+	/* dynamic_array_sort(&test); */
+
+	/* /1* Print the contents of the dynamic array *1/ */
+	/* printf("[ "); */
+	/* for (int i = 0; i < test.length; i++) { */
+	/* 	printf("\"%s\"", ((String *) test.array[i])->data); */
+	/* 	if (i < test.length - 1) printf(", "); */
+	/* } */
+	/* printf(" ]\n"); */
 }
