@@ -21,6 +21,7 @@ void create_string_in_place(String *dst, char *s) {
 	dst->length = strlen(s);
 	dst->capacity = dst->length + 1; // + 1 for the null terminator
 	dst->data = malloc(dst->capacity);
+	memcpy(dst->data, s, dst->capacity);
 }
 
 
