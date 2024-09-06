@@ -12,6 +12,94 @@
 #include "dynamic-array.h"
 
 
+/* duplicate/destroy PartialFileComparison functions {{{ */
+void duplicate_partial_file_comparison(PartialFileComparison *dst, \
+	PartialFileComparison *src) {
+
+	dst->cmp = src->cmp;
+	dst->first_fm = src->first_fm;
+	dst->second_fm = src->second_fm;
+}
+
+
+void destroy_partial_file_comparison(PartialFileComparison *fc) {
+	return;
+}
+/* }}} */
+
+
+/* duplicate/destroy FullFileComparison functions {{{ */
+void duplicate_full_file_comparison(FullFileComparison *dst, \
+	FullFileComparison *src) {
+
+	duplicate_partial_file_comparison(&dst->partial_cmp, &src->partial_cmp);
+	duplicate_string(&dst->first_path, &src->first_path);
+	duplicate_string(&dst->second_path, &src->second_path);
+}
+
+
+void destroy_full_file_comparison(FullFileComparison *fc) {
+	destroy_partial_file_comparison(&fc->partial_cmp);
+	destroy_string(&fc->first_path);
+	destroy_string(&fc->second_path);
+}
+/* }}} */
+
+
+/* DynamicArray helper copy/compare/destroy String functions {{{ */
+void * copy_function_String(void *s) {
+	String *ret = malloc(sizeof(String));
+	String *src = (String *) s;
+	duplicate_string(ret, src);
+
+	return (void *) ret;
+}
+
+
+int compare_function_String(void *s1, void *s2) {
+	String *string1 = (String *) s1;
+	String *string2 = (String *) s2;
+
+	size_t longest_strlen = strlen(string1->data);
+	if (strlen(string2->data) > longest_strlen) 
+		longest_strlen = strlen(string2->data);
+
+	return strncmp(string1->data, string2->data, longest_strlen);
+}
+
+
+void destroy_function_String(void *s) {
+	String *src = (String *) s;
+	destroy_string(src);
+}
+/* }}} */
+
+
+/* DynamicArray helper copy/compare/destroy FullFileComparison functions {{{ */
+void * copy_function_FullFileComparison(void *ffc) {
+	FullFileComparison *ret = malloc(sizeof(FullFileComparison));
+	FullFileComparison *src = (FullFileComparison *) ffc;
+	duplicate_full_file_comparison(ret, src);
+
+	return (void *) ret;
+}
+
+
+int compare_function_FullFileComparison(void *ffc1, void *ffc2) {
+	/* FullFileComparison *first_ffc = (FullFileComparison *) ffc1; */
+	/* FullFileComparison *second_ffc = (FullFileComparison *) ffc2; */
+
+	return 0;
+}
+
+
+void destroy_function_FullFileComparison(void *ffc) {
+	FullFileComparison *src = (FullFileComparison *) ffc;
+	destroy_full_file_comparison(src);
+}
+/* }}} */
+
+
 int str_eq(char *s1, char *s2) {
 	/* {{{ */
 	if (strlen(s1) == strlen(s2) && 0 == strncmp(s1, s2, strlen(s1))) {
@@ -113,6 +201,8 @@ int get_file_mode(char *file_path, unsigned int *ret) {
 DynamicArray relative_files_in_tree(String *root, String *extension) {
 	/* {{{ */
 	DynamicArray ret;
+	dynamic_array_init(&ret, 2, &copy_function_String, \
+		&compare_function_String, &destroy_function_String);
 	String *dir_path = path_extend(root, extension);
 
 	DIR *dir;
@@ -127,7 +217,7 @@ DynamicArray relative_files_in_tree(String *root, String *extension) {
 			if (0 != str_eq(file_name.data, ".") && 0 != str_eq(file_name.data, "..")) {
 				String *file_fp = path_extend(dir_path, &file_name);
 				String *file_rp = path_extend(extension, &file_name);
-				dynamic_array_push(&ret, file_rp->data);
+				dynamic_array_push(&ret, file_rp);
 
 				/* If the current element is a directory... */
 				if (is_dir(file_fp->data)) {
@@ -234,25 +324,30 @@ PartialFileComparison compare_path(String *first_path, String *second_path) {
  * \return negative int if there was an error, 0 if the file path leads to a
  *     directory, 1 if it does not.
  */
-//
-//std::vector<FullFileComparison> compare_directory_trees(String *first_root, \
-//	String * second_root) {
+/* DynamicArray<FullFileComparison> */
 DynamicArray compare_directory_trees(String *first_root, \
 	String * second_root) {
 
-	// std::vector<FullFileComparison> ret;
+	/* DynamicArray<FullFileComparison> */
 	DynamicArray ret;
-	// /* Get the first directory file list and the second directory file list:
-	//  * the list of files in each directory */
-	// DynamicArray first_ft = files_in_tree(first_root);
-	// DynamicArray second_ft = files_in_tree(second_root);
+	dynamic_array_init(&ret, 2, &copy_function_FullFileComparison, \
+		&compare_function_FullFileComparison, \
+		&destroy_function_FullFileComparison);
+	/* Get the first directory file list and the second directory file list:
+	 * the list of files in each directory */
+	/* DynamicArray<String> */
+	DynamicArray first_ft = files_in_tree(first_root);
+	DynamicArray second_ft = files_in_tree(second_root);
 
-	// /* Create a vector that contains both the files from the first directory
-	//  * tree and the files from the second directory tree */
-	// DynamicArray combined_ft;
-	// dynamic_array_concat(&combined_ft, &first_ft);
-	// dynamic_array_concat(&combined_ft, &second_ft);
-	// // TODO:
+	/* Create a vector that contains both the files from the first directory
+	 * tree and the files from the second directory tree */
+	/* DynamicArray<String> */
+	DynamicArray combined_ft;
+	dynamic_array_init(&ret, 2, &copy_function_String, \
+		&compare_function_String, &destroy_function_String);
+	dynamic_array_concat(&combined_ft, &first_ft);
+	dynamic_array_concat(&combined_ft, &second_ft);
+	// // TODO: sort the combined file tree list, then remove non-unique elements
 	// /* Sort the combined file tree and remove duplicate items */
 	// std::sort(combined_ft.begin(), combined_ft.end());
 	// auto last = std::unique(combined_ft.begin(), combined_ft.end());
@@ -288,7 +383,7 @@ int main(int argc, char **argv) {
 
 	/* Loop through all the arguments that specify directories and check that
 	 * they are valid */
-	for (int i = 0; i < sizeof(directory_args); i++) {
+	for (int i = 0; i < sizeof(directory_args)/sizeof(directory_args[0]); i++) {
 		/* Check if the given argument is a file path that points to something
 		* that exists... */
 		if (0 != is_dir(directory_args[i]->data)) {
@@ -307,4 +402,42 @@ int main(int argc, char **argv) {
 	// 		<< std::get<1>(e) << ", " \
 	// 		<< std::get<2>(e) << "\n";
 	// }
+
+	DynamicArray test;
+	dynamic_array_init(&test, 2, &copy_function_String, \
+		&compare_function_String, &destroy_function_String);
+	String *test_string = create_string("firsttest");
+	dynamic_array_push(&test, test_string);
+
+	/* Print the contents of the dynamic array */
+	printf("[ ");
+	for (int i = 0; i < test.length; i++) {
+		printf("\"%s\"", ((String *) test.array[i])->data);
+		if (i < test.length - 1) printf(", ");
+	}
+	printf(" ]\n");
+
+	destroy_string(test_string);
+	free(test_string);
+	test_string = create_string("anotherstring");
+	dynamic_array_push(&test, test_string);
+
+	/* Print the contents of the dynamic array */
+	printf("[ ");
+	for (int i = 0; i < test.length; i++) {
+		printf("\"%s\"", ((String *) test.array[i])->data);
+		if (i < test.length - 1) printf(", ");
+	}
+	printf(" ]\n");
+
+	/* Sort the array */
+	dynamic_array_sort(&test);
+
+	/* Print the contents of the dynamic array */
+	printf("[ ");
+	for (int i = 0; i < test.length; i++) {
+		printf("\"%s\"", ((String *) test.array[i])->data);
+		if (i < test.length - 1) printf(", ");
+	}
+	printf(" ]\n");
 }

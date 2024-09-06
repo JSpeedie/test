@@ -18,4 +18,12 @@ typedef struct full_file_cmp {
 	String second_path;
 }FullFileComparison;
 
+
+void * copy_function_String(void *s);
+int compare_function_String(void *s1, void *s2);
+void destroy_function_String(void *s);
+void * copy_function_FullFileComparison(void *ffc);
+int compare_function_FullFileComparison(void *ffc1, void *ffc2);
+void destroy_function_FullFileComparison(void *ffc);
+
 #endif

@@ -11,6 +11,7 @@ String * create_string(char *s) {
 	ret->length = strlen(s);
 	ret->capacity = ret->length + 1; // + 1 for the null terminator
 	ret->data = malloc(ret->capacity);
+	memcpy(ret->data, s, ret->capacity);
 
 	return ret;
 }
