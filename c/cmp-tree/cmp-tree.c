@@ -12,6 +12,19 @@
 #include "dynamic-array.h"
 
 
+/* For printing coloured output */
+char NOTHING[] = { "" };
+char BOLD[] = { "\x1B[1m" };
+char NORMAL[] = { "\x1B[0m" };
+char RED[] = { "\x1B[31m" };
+char GREEN[] = { "\x1B[32m" };
+char YELLOW[] = { "\x1B[33m" };
+char BLUE[] = { "\x1B[34m" };
+char MAGENTA[] = { "\x1B[35m" };
+char CYAN[] = { "\x1B[36m" };
+char WHITE[] = { "\x1B[37m" };
+
+
 /* duplicate/destroy PartialFileComparison functions {{{ */
 void duplicate_partial_file_comparison(PartialFileComparison *dst, \
 	PartialFileComparison *src) {
@@ -427,11 +440,77 @@ int main(int argc, char **argv) {
 	DynamicArray *comparisons = \
 		compare_directory_trees(first_path, second_path);
 
-	fprintf(stdout, "Comparisons:\n");
+	long max_num_file_matches = 0;
+	long max_num_dir_matches = 0;
+	long num_file_matches = 0;
+	long num_dir_matches = 0;
 
 	for (int i = 0; i < comparisons->length; i++) {
 		FullFileComparison *ffc = (FullFileComparison *) comparisons->array[i];
-		fprintf(stdout, "%d, \"%s\", \"%s\"\n", ffc->partial_cmp.cmp, \
-			ffc->first_path.data, ffc->second_path.data);
+
+		if (ffc->partial_cmp.first_fm == S_IFDIR \
+			|| ffc->partial_cmp.second_fm == S_IFDIR) {
+
+			max_num_dir_matches++;
+		}
+		if (ffc->partial_cmp.first_fm == S_IFREG \
+			|| ffc->partial_cmp.second_fm == S_IFREG) {
+
+			max_num_file_matches++;
+		}
+
+		if (ffc->partial_cmp.first_fm == S_IFREG \
+			&& ffc->partial_cmp.second_fm == S_IFREG) {
+
+			if (ffc->partial_cmp.cmp == true) {
+				printf("%s%s\"%s\" == \"%s\"%s\n",
+					BOLD, GREEN, ffc->first_path.data, ffc->second_path.data, \
+					NORMAL);
+				num_file_matches++;
+			} else {
+				printf("%s%s\"%s\" differs from \"%s\"%s\n",
+					BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
+					NORMAL);
+			}
+		} else if (ffc->partial_cmp.first_fm == S_IFDIR \
+			&& ffc->partial_cmp.second_fm == S_IFDIR) {
+
+			printf("%s%s\"%s\" == \"%s\"%s\n",
+				BOLD, GREEN, ffc->first_path.data, ffc->second_path.data, \
+				NORMAL);
+			num_dir_matches++;
+		} else if (ffc->partial_cmp.first_fm != ffc->partial_cmp.second_fm) {
+
+			// TODO: currently this program calls this printf if one
+			// file exists and the other doesn't. You need to have some sort
+			// of check for that. Maybe make an enum that represents the
+			// outcome of a comparison rather than using stdbool. You can
+			// have an enum for "mismatching types", "first file exists but
+			// the second file does not", "first file does not exist but
+			// second file does", "files are byte for byte identical",
+			// "both files were dirs", etc. By using an enum, you can move
+			// all these strange file mode/type checks into your
+			// comparison functions and avoid calling cmp on mismatching types
+			// or dirs. This might end up simplifying your structs since
+			// the file mode/types only need to be known prior to the setting
+			// of the enum value.
+			printf("%s%s\"%s\" is not of the same type as \"%s\"%s\n",
+				BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
+				NORMAL);
+		} else {
+			printf("%s%s\"%s\" and \"%s\" are both neither a " \
+				"file nor a directory. This is currently not supported." \
+				"%s\n", BOLD, RED, ffc->first_path.data, \
+				ffc->second_path.data, NORMAL);
+		}
+
+		/* fprintf(stdout, "%d, \"%s\", \"%s\"\n", ffc->partial_cmp.cmp, \ */
+		/* 	ffc->first_path.data, ffc->second_path.data); */
 	}
+
+	fprintf(stdout, "All done!\n");
+	fprintf(stdout, "File byte-for-byte matches: %ld/%ld\n", \
+		num_file_matches, max_num_file_matches);
+	fprintf(stdout, "Directory matches: %ld/%ld\n", num_dir_matches, \
+		max_num_dir_matches);
 }
