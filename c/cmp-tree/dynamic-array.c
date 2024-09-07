@@ -473,15 +473,3 @@ void dynamic_array_destroy(DynamicArray *da) {
 // 	fprintf(stdout, "]\n");
 // 	/* }}} */
 // }
-
-
-// TODO: Plan:
-// 1. Create a dynamic_array_merge_sort function for sorting dynamic arrays
-//     a. Make dynamic arrays take a comparison function that returns 0 when
-//        the two items compared and -1, 1 if one is greater than the other
-//     b. Use that comparison function to implementat a type-indepedent merge
-//        sort function
-// 2. Create a dynamic_array_unique function that removes adjacent repeated
-//    items.
-//     a. This will rely on that comparison function returning 0 if the compared
-//        items are equal.

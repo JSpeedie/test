@@ -110,6 +110,7 @@ int str_eq(char *s1, char *s2) {
 	/* }}} */
 }
 
+
 String *path_extend(String *root, String *extension) {
 	/* {{{ */
 	String *ret = malloc(sizeof(String));
@@ -139,7 +140,9 @@ String *path_extend(String *root, String *extension) {
 		ret->capacity = root->length + extension->length + 2;
 		memcpy(&ret->data[0], root->data, root->length);
 		ret->data[root->length] = '/';
-		memcpy(&ret->data[root->length + 1], extension->data, extension->capacity);
+		memcpy(&ret->data[root->length + 1], \
+			extension->data, \
+			extension->capacity);
 		ret->length = strlen(ret->data);
 	}
 
@@ -150,7 +153,7 @@ String *path_extend(String *root, String *extension) {
 
 /** Returns an int representing whether the given file path points to a
  * directory or not.
-
+ *
  * \param '*file_path' the file path to the (possible) directory to be checked.
  * \return negative int if there was an error, 0 if the file path leads to a
  *     directory, 1 if it does not.
@@ -176,12 +179,12 @@ int is_dir(char *file_path) {
 
 /** Returns an int representing the mode (or type) of the file pointed to by
  * the file path '*file_path'.
-
+ *
  * \param '*file_path' a file path which points to the file we wish to get the
  *     file mode of.
- * \param '*ret' a return variable which (on success) will be modified to contain
- *     an unsigned integer representing the mode (or type) of the file. This
- *     value can be compared to the 'S_IFDIR', 'S_IFREG', etc. constants
+ * \param '*ret' a return variable which (on success) will be modified to
+ *     contain an unsigned integer representing the mode (or type) of the file.
+ *     This value can be compared to the 'S_IFDIR', 'S_IFREG', etc. constants
  *     provided by <sys/stat.h> to confirm which type the file is.
  * \return negative int if there was an error, 0 on success.
  */
@@ -200,15 +203,19 @@ int get_file_mode(char *file_path, unsigned int *ret) {
 }
 
 
-// TODO: update this copy-pasted doc
 /** Returns an unsorted vector list of file names for all files (including
  * hidden files) in a directory tree rooted at the directory pointed to by
- * '&dir_path'.
-
- * \param '&dir_path' the file path to the directory for which we wish
- *     to get a list of all the files in the directory tree.
+ * '&dir_path'. Paths will be missing their dirname so as to facilitate
+ * appending these relative filepaths to both the first directory tree root
+ * and the second directory tree root.
+ *
+ * \param '*root' the file path to the directory tree root.
+ * \param '*extension' a relative file path that when added to the '*root'
+ *    file path (using 'path_extend()') creates a full file path to the current
+ *    directory which will have its contents added to the return array.
  * \return an unsorted vector list of the relative file paths for all the files
- *     in the directory tree rooted at '&dir_path'.
+ *     in the directory tree rooted at the file path created by extending
+ *     '*root' with '*extension'.
  */
 DynamicArray relative_files_in_tree(String *root, String *extension) {
 	/* {{{ */
@@ -238,7 +245,8 @@ DynamicArray relative_files_in_tree(String *root, String *extension) {
 				if (0 == is_dir(file_fp->data)) {
 					/* Recurse and append the sub directory relative file
 					 * paths */
-					DynamicArray sub_ret = relative_files_in_tree(root, file_rp);
+					DynamicArray sub_ret = \
+						relative_files_in_tree(root, file_rp);
 					dynamic_array_concat(&ret, &sub_ret);
 				}
 			}
@@ -256,9 +264,10 @@ DynamicArray relative_files_in_tree(String *root, String *extension) {
 
 
 /** Returns an unsorted vector list file paths for all the files (in the broad
- * sense of the word, including links and directories, as well as hidden regular
- * files) in a directory tree rooted at the directory pointed to by '&root'.
-
+ * sense of the word, including links and directories, as well as hidden
+ * regular files) in a directory tree rooted at the directory pointed to by
+ * '&root'.
+ *
  * \param '&dir_path' the file path to the directory for which we wish to get
  *     a list of all the files in the directory tree.
  * \return an unsorted vector list of the relative file paths for all the files
@@ -304,7 +313,8 @@ PartialFileComparison compare_path(String *first_path, String *second_path) {
 	/* If child process... */
 	if (child_pid == 0) {
 		/* Execute cmp to compare the two files */
-		execlp("cmp", "cmp", first_path->data, second_path->data, (char *)NULL);
+		execlp("cmp", "cmp", first_path->data, second_path->data, \
+			(char *) NULL);
 
 		/* If this point is reached, the execlp() command failed */
 		fprintf(stderr, "ERROR: cmp call failed\n");
@@ -335,18 +345,18 @@ PartialFileComparison compare_path(String *first_path, String *second_path) {
  * the files pointed to by the second and third members are byte-for-byte
  * identical. If the first member is negative, there was an error, and if the
  * first member is positive, the files were different in some way.
-
+ *
  * \param 'file_path' the file path to the (possible) directory to be checked.
  * \return negative int if there was an error, 0 if the file path leads to a
  *     directory, 1 if it does not.
  */
 /* DynamicArray<FullFileComparison> */
-DynamicArray compare_directory_trees(String *first_root, \
+DynamicArray *compare_directory_trees(String *first_root, \
 	String * second_root) {
 
 	/* DynamicArray<FullFileComparison> */
-	DynamicArray ret;
-	dynamic_array_init(&ret, 2, &copy_function_FullFileComparison, \
+	DynamicArray *ret = malloc(sizeof(DynamicArray));
+	dynamic_array_init(ret, 2, &copy_function_FullFileComparison, \
 		&compare_function_FullFileComparison, \
 		&destroy_function_FullFileComparison);
 	/* Get the first directory file list and the second directory file list:
@@ -359,7 +369,7 @@ DynamicArray compare_directory_trees(String *first_root, \
 	 * tree and the files from the second directory tree */
 	/* DynamicArray<String> */
 	DynamicArray combined_ft;
-	dynamic_array_init(&ret, 2, &copy_function_String, \
+	dynamic_array_init(&combined_ft, 2, &copy_function_String, \
 		&compare_function_String, &destroy_function_String);
 	dynamic_array_concat(&combined_ft, &first_ft);
 	dynamic_array_concat(&combined_ft, &second_ft);
@@ -369,19 +379,20 @@ DynamicArray compare_directory_trees(String *first_root, \
 	/* Remove adjacent duplicate items in the dynamic array */
 	dynamic_array_unique(&combined_ft);
 
-	// TODO:
-	// /* Go through all the files in the combined  file list, create two full
-	//  * paths to the file, one rooted at '&first_root', one rooted at
-	//  * '&second_root', and compare them */
-	// for (int i = 0; i < combined_ft.length; i++) {
-	// 	String *first_file = path_extend(first_root, &combined_ft[i]);
-	// 	String *second_file = path_extend(second_root, &combined_ft[i]);
-	// 	FullFileComparison res;
-	// 	res.partial_cmp = compare_path(first_file, second_file);
-	// 	res.first_path = first_file;
-	// 	res.second_path = second_file;
-	// 	dynamic_array_push(&ret, res);
-	// }
+	/* Go through all the files in the combined  file list, create two full
+	 * paths to the file, one rooted at '&first_root', one rooted at
+	 * '&second_root', and compare them */
+	for (int i = 0; i < combined_ft.length; i++) {
+		String *first_file = \
+			path_extend(first_root, (String *) combined_ft.array[i]);
+		String *second_file = \
+			path_extend(second_root, (String *) combined_ft.array[i]);
+		FullFileComparison res;
+		res.partial_cmp = compare_path(first_file, second_file);
+		duplicate_string(&res.first_path, first_file);
+		duplicate_string(&res.second_path, second_file);
+		dynamic_array_push(ret, &res);
+	}
 
 	return ret;
 }
@@ -400,7 +411,8 @@ int main(int argc, char **argv) {
 
 	/* Loop through all the arguments that specify directories and check that
 	 * they are valid */
-	for (int i = 0; i < sizeof(directory_args)/sizeof(directory_args[0]); i++) {
+	size_t num_dirs = sizeof(directory_args)/sizeof(directory_args[0]);
+	for (int i = 0; i < num_dirs; i++) {
 		/* Check if the given argument is a file path that points to something
 		* that exists... */
 		if (0 != is_dir(directory_args[i]->data)) {
@@ -411,98 +423,15 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	// auto comparisons = compare_directory_trees(first_path, second_path);
-	// std::cout << "Comparisons:\n";
-	// for (auto e: comparisons) {
-	// 	std::cout \
-	// 		<< std::get<0>(std::get<0>(e)) << ", " \
-	// 		<< std::get<1>(e) << ", " \
-	// 		<< std::get<2>(e) << "\n";
-	// }
+	/* Compare the directory trees! */
+	DynamicArray *comparisons = \
+		compare_directory_trees(first_path, second_path);
 
+	fprintf(stdout, "Comparisons:\n");
 
-
-
-
-	/* DynamicArray<String> */
-	DynamicArray first_ft = files_in_tree(first_path);
-	DynamicArray second_ft = files_in_tree(second_path);
-
-	/* DynamicArray<String> */
-	DynamicArray combined_ft;
-	dynamic_array_init(&combined_ft, 2, &copy_function_String, \
-		&compare_function_String, &destroy_function_String);
-	dynamic_array_concat(&combined_ft, &first_ft);
-	dynamic_array_concat(&combined_ft, &second_ft);
-
-	printf("COMBINED FILE TREE =====================================\n");
-	/* Print the contents of the dynamic array */
-	printf("[ ");
-	for (int i = 0; i < combined_ft.length; i++) {
-		printf("\"%s\"", ((String *) combined_ft.array[i])->data);
-		if (i < combined_ft.length - 1) printf(", ");
+	for (int i = 0; i < comparisons->length; i++) {
+		FullFileComparison *ffc = (FullFileComparison *) comparisons->array[i];
+		fprintf(stdout, "%d, \"%s\", \"%s\"\n", ffc->partial_cmp.cmp, \
+			ffc->first_path.data, ffc->second_path.data);
 	}
-	printf(" ]\n");
-
-	dynamic_array_sort(&combined_ft);
-
-	printf("COMBINED FILE TREE SORTED ==============================\n");
-	/* Print the contents of the dynamic array */
-	printf("[ ");
-	for (int i = 0; i < combined_ft.length; i++) {
-		printf("\"%s\"", ((String *) combined_ft.array[i])->data);
-		if (i < combined_ft.length - 1) printf(", ");
-	}
-	printf(" ]\n");
-
-	dynamic_array_unique(&combined_ft);
-
-	printf("COMBINED FILE TREE UNIQUE ==============================\n");
-	/* Print the contents of the dynamic array */
-	printf("[ ");
-	for (int i = 0; i < combined_ft.length; i++) {
-		printf("\"%s\"", ((String *) combined_ft.array[i])->data);
-		if (i < combined_ft.length - 1) printf(", ");
-	}
-	printf(" ]\n");
-
-
-
-	/* DynamicArray test; */
-	/* dynamic_array_init(&test, 2, &copy_function_String, \ */
-	/* 	&compare_function_String, &destroy_function_String); */
-	/* String *test_string = create_string("firsttest"); */
-	/* dynamic_array_push(&test, test_string); */
-
-	/* /1* Print the contents of the dynamic array *1/ */
-	/* printf("[ "); */
-	/* for (int i = 0; i < test.length; i++) { */
-	/* 	printf("\"%s\"", ((String *) test.array[i])->data); */
-	/* 	if (i < test.length - 1) printf(", "); */
-	/* } */
-	/* printf(" ]\n"); */
-
-	/* destroy_string(test_string); */
-	/* free(test_string); */
-	/* test_string = create_string("anotherstring"); */
-	/* dynamic_array_push(&test, test_string); */
-
-	/* /1* Print the contents of the dynamic array *1/ */
-	/* printf("[ "); */
-	/* for (int i = 0; i < test.length; i++) { */
-	/* 	printf("\"%s\"", ((String *) test.array[i])->data); */
-	/* 	if (i < test.length - 1) printf(", "); */
-	/* } */
-	/* printf(" ]\n"); */
-
-	/* /1* Sort the array *1/ */
-	/* dynamic_array_sort(&test); */
-
-	/* /1* Print the contents of the dynamic array *1/ */
-	/* printf("[ "); */
-	/* for (int i = 0; i < test.length; i++) { */
-	/* 	printf("\"%s\"", ((String *) test.array[i])->data); */
-	/* 	if (i < test.length - 1) printf(", "); */
-	/* } */
-	/* printf(" ]\n"); */
 }
