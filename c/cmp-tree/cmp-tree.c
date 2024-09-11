@@ -29,7 +29,7 @@ char WHITE[] = { "\x1B[37m" };
 void duplicate_partial_file_comparison(PartialFileComparison *dst, \
 	PartialFileComparison *src) {
 
-	dst->cmp = src->cmp;
+	dst->file_cmp = src->file_cmp;
 	dst->first_fm = src->first_fm;
 	dst->second_fm = src->second_fm;
 }
@@ -142,7 +142,7 @@ String *path_extend(String *root, String *extension) {
 
 	/* Return the extended path, inserting a '/' if '*root' does not already
 	 * include one */
-	if (root->data[root->length] == '/') {
+	if (root->data[root->length - 1] == '/') {
 		ret->data = malloc(root->length + extension->length + 1);
 		ret->capacity = root->length + extension->length + 1;
 		memcpy(&ret->data[0], root->data, root->length);
@@ -186,6 +186,26 @@ int is_dir(char *file_path) {
 
 	/* If we make it to this line, '*file_path' does NOT point to a dir */
 	return 1;
+	/* }}} */
+}
+
+
+/** Returns an int representing whether the file (understood in the broad
+ * sense) pointed to by the given path points to a file that exists.
+ *
+ * \param '*file_path' the file path to the (possible) file (understood in the
+ *     broad sense) whose existence we wish to check.
+ * \return negative int if there was an error or if the file path leads to a
+ *     file which does not exist, and 0 if the file path leads to a file which
+ *     exists.
+ */
+int exists(char *file_path) {
+	/* {{{ */
+	if (access(file_path, F_OK) == 0) {
+		return 0;
+	} else {
+		return -1;
+	}
 	/* }}} */
 }
 
@@ -310,44 +330,84 @@ PartialFileComparison compare_path(String *first_path, String *second_path) {
 	/* {{{ */
 	/* Get the file types for both files */
 	PartialFileComparison ret;
-	ret.cmp = false;
-	get_file_mode(first_path->data, &ret.first_fm);
-	get_file_mode(second_path->data, &ret.second_fm);
 
-	/* If the two paths point to files that are of different types (e.g. a
-	 * directory vs. a symlink, a fifo vs a regular file) then return early,
-	 * with the match member set to false */
-	if (ret.first_fm != ret.second_fm) {
+	/* Check file existences first. If neither path points to files that exist,
+	 * return that neither exists. If one file exists, but the other does not,
+	 * get the file mode/type of the existing file and return, setting the
+	 * comparison member so that the caller knows which file does not exist */
+	if (exists(first_path->data) != 0 && exists(second_path->data) != 0) {
+		ret.file_cmp = MISMATCH_NEITHER_EXISTS;
+		return ret;
+	} else if (exists(first_path->data) == 0 && exists(second_path->data) != 0) {
+		get_file_mode(first_path->data, &ret.first_fm);
+		ret.file_cmp = MISMATCH_ONLY_FIRST_EXISTS;
+		return ret;
+	} else if (exists(first_path->data) != 0 && exists(second_path->data) == 0) {
+		get_file_mode(second_path->data, &ret.second_fm);
+		ret.file_cmp = MISMATCH_ONLY_SECOND_EXISTS;
 		return ret;
 	}
 
-	pid_t child_pid = fork();
+	/* Check file modes/types. At this point we know both files exist, but if
+	 * they are of different types (e.g. a fifo vs a regular file) then
+	 * return with the two file modes/types and setting the comparison member
+	 * so the caller knows the types of the two files */
+	get_file_mode(first_path->data, &ret.first_fm);
+	get_file_mode(second_path->data, &ret.second_fm);
 
-	/* If child process... */
-	if (child_pid == 0) {
-		/* Execute cmp to compare the two files */
-		execlp("cmp", "cmp", first_path->data, second_path->data, \
-			(char *) NULL);
-
-		/* If this point is reached, the execlp() command failed */
-		fprintf(stderr, "ERROR: cmp call failed\n");
-		exit(-1);
-	/* If parent process... */
-	} else {
-		int r;
-		waitpid(child_pid, &r, 0);
-
-		/* If 'cmp' succeeded we know that this means the two files are
-		 * byte-for-byte identical. Return true for the match member */
-		if (r == 0) {
-			ret.cmp = true;
-		}
+	if (ret.first_fm != ret.second_fm) {
+		ret.file_cmp = MISMATCH_TYPE;
+		return ret;
 	}
 
-	/* If 'cmp' failed (and because we checked whether the paths both pointed
-	 * to the same kind of file earlier) we know that this means the two files
-	 * are NOT byte-for-byte identical. Return false for the match member */
-	return ret;
+	/* Check that the two files are equivalent. At this point we know both
+	 * files exist and that they are of the same type. The various types the
+	 * files could both be need individual methods for checking equivalence.
+	 * Regular files will use 'cmp', directories will simply return a match
+	 * since both files are directories */
+	if (ret.first_fm == S_IFDIR) {
+		ret.file_cmp = MATCH;
+		return ret;
+	} else if (ret.first_fm == S_IFREG) {
+		pid_t child_pid = fork();
+
+		/* If child process... */
+		if (child_pid == 0) {
+			/* Execute cmp to compare the two files */
+			execlp("cmp", "cmp", first_path->data, second_path->data, \
+				(char *) NULL);
+
+			/* If this point is reached, the execlp() command failed */
+			fprintf(stderr, "ERROR: cmp call failed\n");
+			exit(-1);
+		/* If parent process... */
+		} else {
+			int r;
+			waitpid(child_pid, &r, 0);
+
+			/* If 'cmp' succeeded we know that this means the two files are
+			 * byte-for-byte identical. Return with the comparison member set to
+			 * match */
+			if (r == 0) {
+				ret.file_cmp = MATCH;
+				return ret;
+			}
+		}
+
+		/* If we make it to this point, 'cmp' failed and since we handled
+		 * existence status mismatches and file mode/type mismatches earlier,
+		 * we know that if 'cmp' failed, the two  files are NOT byte-for-byte
+		 * identical. Set the match member to reflect that there's a mismatch
+		 * in content. */
+		ret.file_cmp = MISMATCH_CONTENT;
+		return ret;
+	/* TODO: Other file types do not yet have support. At the moment, they are
+	 * treated the same way directories are: if they both exist, and are of
+	 * the same type, return that they match. */
+	} else {
+		ret.file_cmp = MATCH;
+		return ret;
+	}
 	/* }}} */
 }
 
@@ -459,53 +519,39 @@ int main(int argc, char **argv) {
 			max_num_file_matches++;
 		}
 
-		if (ffc->partial_cmp.first_fm == S_IFREG \
-			&& ffc->partial_cmp.second_fm == S_IFREG) {
-
-			if (ffc->partial_cmp.cmp == true) {
+		switch (ffc->partial_cmp.file_cmp) {
+			case MATCH:
 				printf("%s%s\"%s\" == \"%s\"%s\n",
 					BOLD, GREEN, ffc->first_path.data, ffc->second_path.data, \
 					NORMAL);
 				num_file_matches++;
-			} else {
+				break;
+			case MISMATCH_TYPE:
+				printf("%s%s\"%s\" is not of the same type as \"%s\"%s\n",
+					BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
+					NORMAL);
+				break;
+			case MISMATCH_CONTENT:
 				printf("%s%s\"%s\" differs from \"%s\"%s\n",
 					BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
 					NORMAL);
-			}
-		} else if (ffc->partial_cmp.first_fm == S_IFDIR \
-			&& ffc->partial_cmp.second_fm == S_IFDIR) {
-
-			printf("%s%s\"%s\" == \"%s\"%s\n",
-				BOLD, GREEN, ffc->first_path.data, ffc->second_path.data, \
-				NORMAL);
-			num_dir_matches++;
-		} else if (ffc->partial_cmp.first_fm != ffc->partial_cmp.second_fm) {
-
-			// TODO: currently this program calls this printf if one
-			// file exists and the other doesn't. You need to have some sort
-			// of check for that. Maybe make an enum that represents the
-			// outcome of a comparison rather than using stdbool. You can
-			// have an enum for "mismatching types", "first file exists but
-			// the second file does not", "first file does not exist but
-			// second file does", "files are byte for byte identical",
-			// "both files were dirs", etc. By using an enum, you can move
-			// all these strange file mode/type checks into your
-			// comparison functions and avoid calling cmp on mismatching types
-			// or dirs. This might end up simplifying your structs since
-			// the file mode/types only need to be known prior to the setting
-			// of the enum value.
-			printf("%s%s\"%s\" is not of the same type as \"%s\"%s\n",
-				BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
-				NORMAL);
-		} else {
-			printf("%s%s\"%s\" and \"%s\" are both neither a " \
-				"file nor a directory. This is currently not supported." \
-				"%s\n", BOLD, RED, ffc->first_path.data, \
-				ffc->second_path.data, NORMAL);
+				break;
+			case MISMATCH_NEITHER_EXISTS:
+				printf("%s%sNeither \"%s\" nor \"%s\" exist%s\n",
+					BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
+					NORMAL);
+				break;
+			case MISMATCH_ONLY_FIRST_EXISTS:
+				printf("%s%s\"%s\" exists, but \"%s\" does NOT exist%s\n",
+					BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
+					NORMAL);
+				break;
+			case MISMATCH_ONLY_SECOND_EXISTS:
+				printf("%s%s\"%s\" does NOT exist, but \"%s\" does exist%s\n",
+					BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
+					NORMAL);
+				break;
 		}
-
-		/* fprintf(stdout, "%d, \"%s\", \"%s\"\n", ffc->partial_cmp.cmp, \ */
-		/* 	ffc->first_path.data, ffc->second_path.data); */
 	}
 
 	fprintf(stdout, "All done!\n");
