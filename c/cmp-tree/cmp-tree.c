@@ -1,4 +1,6 @@
 #include <dirent.h>
+#include <getopt.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -472,12 +474,35 @@ DynamicArray *compare_directory_trees(String *first_root, \
 
 
 int main(int argc, char **argv) {
-	if (argc != 3) {
+	bool flag_print_totals = false;
+	bool flag_print_matches = false;
+	bool flag_pretty_output = false;
+
+	int opt;
+	struct option opt_table[] = {
+		{ "matches",  no_argument,  NULL,  'm' },
+		{ "pretty",   no_argument,  NULL,  'p' },
+		{ "totals",   no_argument,  NULL,  't' },
+		{ 0, 0, 0, 0 }
+	};
+	char opt_string[] = { "mpt" };
+
+	while ((opt = getopt_long(argc, argv, opt_string, opt_table, NULL)) != -1) {
+		switch (opt) {
+			case 'm': flag_print_matches = true; break;
+			case 'p': flag_pretty_output = true; break;
+			case 't': flag_print_totals = true; break;
+		}
+	}
+
+	/* If after parsing all the flags there aren't 2 arguments left */
+	if (optind + 2 != argc) {
 		fprintf(stdout, "Expected 2 arguments, received %d\n", argc - 1);
 	}
 
-	String *first_path = create_string(argv[1]);
-	String *second_path = create_string(argv[2]);
+	String *first_path = create_string(argv[optind]);
+	optind++;
+	String *second_path = create_string(argv[optind]);
 	/* Create an array of arguments that specify directories so that
 	 * we can check their validity */
 	String *directory_args[2] = { first_path, second_path };
@@ -521,42 +546,56 @@ int main(int argc, char **argv) {
 
 		switch (ffc->partial_cmp.file_cmp) {
 			case MATCH:
-				printf("%s%s\"%s\" == \"%s\"%s\n",
-					BOLD, GREEN, ffc->first_path.data, ffc->second_path.data, \
-					NORMAL);
-				num_file_matches++;
+				if (flag_print_matches) {
+					if (flag_pretty_output) printf("%s%s", BOLD, GREEN);
+					printf("\"%s\" == \"%s\"\n",
+						ffc->first_path.data, ffc->second_path.data);
+					if (flag_pretty_output) printf("%s", NORMAL);
+				}
+				if (ffc->partial_cmp.first_fm == S_IFREG) {
+					num_file_matches++;
+				} else if (ffc->partial_cmp.first_fm == S_IFDIR) {
+					num_dir_matches++;
+				}
 				break;
 			case MISMATCH_TYPE:
-				printf("%s%s\"%s\" is not of the same type as \"%s\"%s\n",
-					BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
-					NORMAL);
+				if (flag_pretty_output) printf("%s%s", BOLD, RED);
+				printf("\"%s\" is not of the same type as \"%s\"\n",
+					ffc->first_path.data, ffc->second_path.data);
+				if (flag_pretty_output) printf("%s", NORMAL);
 				break;
 			case MISMATCH_CONTENT:
-				printf("%s%s\"%s\" differs from \"%s\"%s\n",
-					BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
-					NORMAL);
+				if (flag_pretty_output) printf("%s%s", BOLD, RED);
+				printf("\"%s\" differs from \"%s\"\n",
+					ffc->first_path.data, ffc->second_path.data);
+				if (flag_pretty_output) printf("%s", NORMAL);
 				break;
 			case MISMATCH_NEITHER_EXISTS:
-				printf("%s%sNeither \"%s\" nor \"%s\" exist%s\n",
-					BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
-					NORMAL);
+				if (flag_pretty_output) printf("%s%s", BOLD, RED);
+				printf("Neither \"%s\" nor \"%s\" exist\n",
+					ffc->first_path.data, ffc->second_path.data);
+				if (flag_pretty_output) printf("%s", NORMAL);
 				break;
 			case MISMATCH_ONLY_FIRST_EXISTS:
-				printf("%s%s\"%s\" exists, but \"%s\" does NOT exist%s\n",
-					BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
-					NORMAL);
+				if (flag_pretty_output) printf("%s%s", BOLD, RED);
+				printf("\"%s\" exists, but \"%s\" does NOT exist\n",
+					ffc->first_path.data, ffc->second_path.data);
+				if (flag_pretty_output) printf("%s", NORMAL);
 				break;
 			case MISMATCH_ONLY_SECOND_EXISTS:
-				printf("%s%s\"%s\" does NOT exist, but \"%s\" does exist%s\n",
-					BOLD, RED, ffc->first_path.data, ffc->second_path.data, \
-					NORMAL);
+				if (flag_pretty_output) printf("%s%s", BOLD, RED);
+				printf("\"%s\" does NOT exist, but \"%s\" does exist\n",
+					ffc->first_path.data, ffc->second_path.data);
+				if (flag_pretty_output) printf("%s", NORMAL);
 				break;
 		}
 	}
 
-	fprintf(stdout, "All done!\n");
-	fprintf(stdout, "File byte-for-byte matches: %ld/%ld\n", \
-		num_file_matches, max_num_file_matches);
-	fprintf(stdout, "Directory matches: %ld/%ld\n", num_dir_matches, \
-		max_num_dir_matches);
+	if (flag_print_totals) {
+		fprintf(stdout, "All done!\n");
+		fprintf(stdout, "File byte-for-byte matches: %ld/%ld\n", \
+			num_file_matches, max_num_file_matches);
+		fprintf(stdout, "Directory matches: %ld/%ld\n", num_dir_matches, \
+			max_num_dir_matches);
+	}
 }
