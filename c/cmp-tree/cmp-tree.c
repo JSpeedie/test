@@ -462,6 +462,11 @@ DynamicArray *compare_directory_trees(String *first_root, \
 	/* Remove adjacent duplicate items in the dynamic array */
 	dynamic_array_unique(&combined_ft);
 
+	// TODO: there should be some multithreading here - we have the full
+	// list of elements we want to compare, divide the list into equal
+	// segments, fork or multithread and have the forks/threads do the
+	// comparisons and then join before outputting the results.
+
 	/* Go through all the files in the combined  file list, create two full
 	 * paths to the file, one rooted at '&first_root', one rooted at
 	 * '&second_root', and compare them */
