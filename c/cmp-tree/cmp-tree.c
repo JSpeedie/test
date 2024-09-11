@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -375,6 +376,13 @@ PartialFileComparison compare_path(String *first_path, String *second_path) {
 
 		/* If child process... */
 		if (child_pid == 0) {
+			/* Create a file descriptor for /dev/null */
+			int null = open("/dev/null", O_WRONLY);
+			/* Redirect stdout and stderr for the child process to /dev/null
+			 * before 'execlp'ing so that the output from the child process
+			 * does not get mangled in the output from the parent process */
+			dup2(null, STDOUT_FILENO);
+			dup2(null, STDERR_FILENO);
 			/* Execute cmp to compare the two files */
 			execlp("cmp", "cmp", first_path->data, second_path->data, \
 				(char *) NULL);
