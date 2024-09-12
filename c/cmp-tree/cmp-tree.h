@@ -42,6 +42,15 @@ typedef struct full_file_cmp {
 	String second_path;
 }FullFileComparison;
 
+typedef struct cdt_thread_args {
+	String * first_root;
+	String * second_root;
+	void ** rel_paths;
+	size_t start;
+	size_t end;
+	void ** ret_ffcs;
+}CDTThreadArgs;
+
 
 void * copy_function_String(void *s);
 int compare_function_String(void *s1, void *s2);

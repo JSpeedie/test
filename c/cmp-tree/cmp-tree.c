@@ -1,6 +1,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -422,6 +423,30 @@ PartialFileComparison compare_path(String *first_path, String *second_path) {
 }
 
 
+/** Helper function for compressing a file through multiple threads */
+void *compare_directory_trees_thread(void *arg) {
+	CDTThreadArgs *t = (CDTThreadArgs *) arg;
+
+	/* Go through the assigned files in the combined  file list, create two
+	 * full paths to the file, one rooted at '&first_root', one rooted at
+	 * '&second_root', and compare them */
+	for (size_t i = t->start; i <= t->end; i++) {
+		String *first_file = \
+			path_extend(t->first_root, (String *) (t->rel_paths[i]));
+		String *second_file = \
+			path_extend(t->second_root, (String *) (t->rel_paths[i]));
+		FullFileComparison res;
+		res.partial_cmp = compare_path(first_file, second_file);
+		duplicate_string(&res.first_path, first_file);
+		duplicate_string(&res.second_path, second_file);
+		/* Store full file comparison result in the shared return array */
+		t->ret_ffcs[i] = copy_function_FullFileComparison(&res);
+	}
+
+	return NULL;
+}
+
+
 /** Returns an unsorted vector list of tuples where the first member represents
  * the result of a comparison between the file represented by the second member
  * and the file represented by the third member. If the first member is 0,
@@ -437,11 +462,6 @@ PartialFileComparison compare_path(String *first_path, String *second_path) {
 DynamicArray *compare_directory_trees(String *first_root, \
 	String * second_root) {
 
-	/* DynamicArray<FullFileComparison> */
-	DynamicArray *ret = malloc(sizeof(DynamicArray));
-	dynamic_array_init(ret, 2, &copy_function_FullFileComparison, \
-		&compare_function_FullFileComparison, \
-		&destroy_function_FullFileComparison);
 	/* Get the first directory file list and the second directory file list:
 	 * the list of files in each directory */
 	/* DynamicArray<String> */
@@ -462,25 +482,86 @@ DynamicArray *compare_directory_trees(String *first_root, \
 	/* Remove adjacent duplicate items in the dynamic array */
 	dynamic_array_unique(&combined_ft);
 
+	/* DynamicArray<FullFileComparison> */
+	DynamicArray *ret = malloc(sizeof(DynamicArray));
+	dynamic_array_init(ret, combined_ft.length, &copy_function_FullFileComparison, \
+		&compare_function_FullFileComparison, \
+		&destroy_function_FullFileComparison);
+
 	// TODO: there should be some multithreading here - we have the full
 	// list of elements we want to compare, divide the list into equal
 	// segments, fork or multithread and have the forks/threads do the
 	// comparisons and then join before outputting the results.
+	//
+	// You can use this opportunity to write a references page for how to
+	// write multithreaded code in C.
+	
+	// ============ MULTI THREADED
+	char num_threads;
+	// TODO: change to a number higher than 1?
+	// TODO: find a better way to determine the number of threads based on the
+	// amount of work
+	if (combined_ft.length <= 8) num_threads = 2;
+	else num_threads = 8;
+	size_t paths_to_assign = combined_ft.length;
+	size_t paths_assigned = 0;
+	size_t paths_per_thread = paths_to_assign / num_threads;
+	CDTThreadArgs args[num_threads];
 
-	/* Go through all the files in the combined  file list, create two full
-	 * paths to the file, one rooted at '&first_root', one rooted at
-	 * '&second_root', and compare them */
-	for (int i = 0; i < combined_ft.length; i++) {
-		String *first_file = \
-			path_extend(first_root, (String *) combined_ft.array[i]);
-		String *second_file = \
-			path_extend(second_root, (String *) combined_ft.array[i]);
-		FullFileComparison res;
-		res.partial_cmp = compare_path(first_file, second_file);
-		duplicate_string(&res.first_path, first_file);
-		duplicate_string(&res.second_path, second_file);
-		dynamic_array_push(ret, &res);
+	/* Set thread arguments */
+	for (int i = 0; i < num_threads; i++) {
+		args[i].first_root = first_root;
+		args[i].second_root = second_root;
+
+		args[i].start = paths_assigned;
+		paths_assigned += paths_per_thread;
+		if (paths_assigned >= paths_to_assign) {
+			paths_assigned = paths_to_assign - 1;
+		}
+		args[i].end = paths_assigned;
+		paths_assigned++;
+
+		args[i].rel_paths = combined_ft.array;
+		args[i].ret_ffcs = ret->array;
 	}
+
+	/* Run Threads */
+	pthread_t thread_id[num_threads];
+	/* Create threads with their given tasks/arguments */
+	for (int t = 0; t < num_threads - 1; t++) {
+		if (0 != pthread_create(&thread_id[t], NULL, \
+			compare_directory_trees_thread, &args[t])) {
+
+			fprintf(stderr, "ERROR: Could not create threads\n");
+		}
+	}
+	/* Have this "thread" do its work as well since otherwise it would be
+	 * waiting idly */
+	compare_directory_trees_thread(&args[num_threads - 1]);
+
+	/* Wait for all the threads to finish their work */
+	for (int t = 0; t < num_threads - 1; t++) {
+		pthread_join(thread_id[t], NULL);
+	}
+
+	/* Hack to fix return array */
+	ret->length = combined_ft.length;
+
+	// ============ SINGLE THREADED
+	/* /1* Go through all the files in the combined  file list, create two full */
+	/*  * paths to the file, one rooted at '&first_root', one rooted at */
+	/*  * '&second_root', and compare them *1/ */
+	/* for (int i = 0; i < combined_ft.length; i++) { */
+	/* 	String *first_file = \ */
+	/* 		path_extend(first_root, (String *) combined_ft.array[i]); */
+	/* 	String *second_file = \ */
+	/* 		path_extend(second_root, (String *) combined_ft.array[i]); */
+	/* 	FullFileComparison res; */
+	/* 	res.partial_cmp = compare_path(first_file, second_file); */
+	/* 	duplicate_string(&res.first_path, first_file); */
+	/* 	duplicate_string(&res.second_path, second_file); */
+	/* 	dynamic_array_push(ret, &res); */
+	/* } */
 
 	return ret;
 }

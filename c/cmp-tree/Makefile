@@ -1,6 +1,6 @@
 # gcc flags for includes
 INCS = -I. -I/usr/include
-LIBS = -L/usr/lib
+LIBS = -L/usr/lib -lpthread
 # Flags
 CFLAGS = -Wall
 # Compiler and linker
