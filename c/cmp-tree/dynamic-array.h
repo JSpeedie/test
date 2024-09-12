@@ -50,6 +50,7 @@ typedef struct dynamic_array_slice {
 int dynamic_array_init(DynamicArray *da, size_t initial_capacity, \
 	void * (*copy_function)(void *), int (*compare_function)(void *, void *), \
 	void (*destroy_function)(void *));
+int dynamic_array_grow(DynamicArray *da);
 int dynamic_array_push(DynamicArray *da, void *new_element);
 int dynamic_array_concat(DynamicArray *target, DynamicArray *extra);
 void dynamic_array_slice_init(DynamicArraySlice *slice, DynamicArray *da, \

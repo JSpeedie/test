@@ -38,6 +38,23 @@ int dynamic_array_init(DynamicArray *da, size_t initial_capacity, \
 }
 
 
+/** Expands the capacity of the dynamic array by a rate of (2n + 1) without
+ * checking if the array is nearing capacity.
+ *
+ * \param '*da' a pointer to a DynamicArray representing the dynamic array
+ *     which will have its capacity expanded.
+ * \return 0 if the dynamic array was successfully grown or -1 if there was an
+ *     error.
+ */
+int dynamic_array_grow(DynamicArray *da) {
+	da->capacity = (2 * da->capacity) + 1; /* 2n + 1 resizing */
+	da->array = realloc(da->array, sizeof(void *) * da->capacity);
+	if (da->array == NULL) return -1;
+
+	return 0;
+}
+
+
 /** Takes a new value and appends it to the dynamic array, resizing the array
  * if necessary.
  *
@@ -49,28 +66,19 @@ int dynamic_array_init(DynamicArray *da, size_t initial_capacity, \
  */
 int dynamic_array_push(DynamicArray *da, void *new_element) {
 	/* {{{ */
-	/* If the dynamic array has the capacity to simply insert the new element
-	 * without resizing */
-	if (da->length + 1 <= da->capacity) {
-		/* Insert the new element at the end of the array */
-		da->array[da->length] = da->copy_function(new_element);
-		da->length += 1;
-
-		return 0;
 	/* If the dynamic array does NOT have the capacity to insert a new
 	 * element without resizing */
-	} else {
+	if (da->length + 1 > da->capacity) {
 		/* Grow the array */
-		da->capacity = (2 * da->capacity) + 1; /* 2n + 1 resizing */
-		da->array = realloc(da->array, sizeof(void *) * da->capacity);
-		if (da->array == NULL) return -1;
-
-		/* Then insert the new element at the end of the array */
-		da->array[da->length] = da->copy_function(new_element);
-		da->length += 1;
-
-		return 0;
+		int ret = dynamic_array_grow(da);
+		if (ret != 0) return ret;
 	}
+
+	/* Then insert the new element at the end of the array */
+	da->array[da->length] = da->copy_function(new_element);
+	da->length += 1;
+
+	return 0;
 	/* }}} */
 }
 
