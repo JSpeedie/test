@@ -1,7 +1,9 @@
 /* C++ includes */
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -38,7 +40,7 @@ char WHITE[] = { "\x1B[37m" };
  * in a directory tree rooted at the directory pointed to by the path
  * '&root' / '&extension'. The file paths included in the list will all
  * begin with '&extension', but not '&root'.
-
+ *
  * \param '&root' the beginning of the file path to the directory for which we wish
  *     to get a list of all the files in the directory tree. It will be combined
  *     with '&extension' to produce the complete path.
@@ -94,7 +96,7 @@ std::vector<fs::path> relative_files_in_tree( \
 /** Returns an unsorted vector list of file paths for all the files (in the broad
  * sense of the word, including links and directories, as well as hidden
  * files) in a directory tree rooted at the directory pointed to by '&root'.
-
+ *
  * \param '&dir_path' the file path to the directory for which we wish to get
  *     a list of all the files in the directory tree.
  * \return an unsorted vector list of the relative file paths for all the files
@@ -104,6 +106,68 @@ std::vector<fs::path> files_in_tree(fs::path &root) {
 	/* {{{ */
 	fs::path extension = "";
 	return relative_files_in_tree(root, extension);
+	/* }}} */
+}
+
+
+/** Takes two paths and returns 0 if the files are byte-for-byte identical,
+ * and -1 if they are not. Both file paths must point to regular files and
+ * both regular files must exist.
+ *
+ * \param '&first_path' a file path that points to the first file we wish to
+ *     compare.
+ * \param '&second_path' a file path that points to the second file we wish to
+ *     compare.
+ * \return 0 if they files are byte-for-byte identical, -1 otherwise.
+ */
+int compare_files(fs::path &first_path, fs::path &second_path) {
+	/* {{{ */
+	/* Check if the files differ in size. If they do, they cannot be
+	 * byte-for-byte identical */
+	struct stat first_file_info;
+	struct stat second_file_info;
+
+	if(stat(first_path.c_str(), &first_file_info) != 0) {
+		/* stat() failed, return -1 */
+		return -1;
+	}
+
+	if(stat(second_path.c_str(), &second_file_info) != 0) {
+		/* stat() failed, return -1 */
+		return -1;
+	}
+
+	if (first_file_info.st_size != second_file_info.st_size) {
+		return -1;
+	}
+
+	/* Read through both files simultaneously, comparing their bytes. If at any
+	 * point two bytes at the same location in the files differ, return -1 */
+	std::ifstream first_stream(first_path.c_str(), std::ifstream::binary);
+	std::ifstream second_stream(second_path.c_str(), std::ifstream::binary);
+	/* Create a buffer of 8192 chars, all initialized to 0(?) */
+	std::vector<char> first_buf(8192, 0);
+	std::vector<char> second_buf(8192, 0);
+
+	while(first_stream.good() && second_stream.good()) {
+		first_stream.read(first_buf.data(), first_buf.size());
+		second_stream.read(second_buf.data(), second_buf.size());
+		std::streamsize first_bytes_read = first_stream.gcount();
+		std::streamsize second_bytes_read = second_stream.gcount();
+
+		/* One file ended before the other */
+		if (first_bytes_read != second_bytes_read) {
+			return -1;
+		}
+
+		if (0 != std::memcmp(first_buf.data(), second_buf.data(), \
+			first_bytes_read)) {
+
+			return -1;
+		}
+	}
+
+	return 0;
 	/* }}} */
 }
 
@@ -176,45 +240,16 @@ PartialFileComparison compare_path( \
 		ret.file_cmp = MATCH;
 		return ret;
 	} else if (ret.first_ft == fs::file_type::regular) {
-		pid_t child_pid = fork();
-
-		/* If child process... */
-		if (child_pid == 0) {
-			/* Create a file descriptor for /dev/null */
-			int null = open("/dev/null", O_WRONLY);
-			/* Redirect stdout and stderr for the child process to /dev/null
-			 * before 'execlp'ing so that the output from the child process
-			 * does not get mangled in the output from the parent process */
-			dup2(null, STDOUT_FILENO);
-			dup2(null, STDERR_FILENO);
-			/* Execute cmp to compare the two files */
-			execlp("cmp", "cmp", first_path.c_str(), second_path.c_str(), \
-				(char *) NULL);
-
-			/* If this point is reached, the execlp() command failed */
-			fprintf(stderr, "ERROR: cmp call failed\n");
-			exit(-1);
-		/* If parent process... */
+		/* If the file comparison succeeded we know that this means the two
+		 * files are byte-for-byte identical. Return with the comparison
+		 * member set to match */
+		if (compare_files(first_path, second_path) == 0) {
+			ret.file_cmp = MATCH;
+			return ret;
 		} else {
-			int r;
-			waitpid(child_pid, &r, 0);
-
-			/* If 'cmp' succeeded we know that this means the two files are
-			 * byte-for-byte identical. Return with the comparison member set to
-			 * match */
-			if (r == 0) {
-				ret.file_cmp = MATCH;
-				return ret;
-			}
+			ret.file_cmp = MISMATCH_CONTENT;
+			return ret;
 		}
-
-		/* If we make it to this point, 'cmp' failed and since we handled
-		 * existence status mismatches and file mode/type mismatches earlier,
-		 * we know that if 'cmp' failed, the two  files are NOT byte-for-byte
-		 * identical. Set the match member to reflect that there's a mismatch
-		 * in content. */
-		ret.file_cmp = MISMATCH_CONTENT;
-		return ret;
 	/* TODO: Other file types do not yet have support. At the moment, they are
 	 * treated the same way directories are: if they both exist, and are of
 	 * the same type, return that they match. */
@@ -232,7 +267,7 @@ PartialFileComparison compare_path( \
  * comparisons between a file and its non-existent equivalent if there is no
  * equivalent in the other root directory. The list is sorted by the relative
  * path of each FullFileComparison.
-
+ *
  * \param '&first_root' the file path to the root of the first directory tree.
  * \param '&second_root' the file path to the root of the second directory tree.
  * \return a vector list of FullFileComparisons representing the comparisons
