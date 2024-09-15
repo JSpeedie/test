@@ -6,6 +6,9 @@
 #include "better-strings.h"
 
 
+#define MIN_COMPARISONS_PER_THREAD 60
+
+
 enum FileCmp {
 	/* For when the two files (understood in the broad sense) match. For regular
 	 * files, this indicates that the two files are byte-for-byte identical.

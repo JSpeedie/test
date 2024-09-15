@@ -332,7 +332,6 @@ DynamicArray files_in_tree(String *root) {
  */
 PartialFileComparison compare_path(String *first_path, String *second_path) {
 	/* {{{ */
-	/* Get the file types for both files */
 	PartialFileComparison ret;
 
 	/* Check file existences first. If neither path points to files that exist,
@@ -498,14 +497,29 @@ DynamicArray *compare_directory_trees(String *first_root, \
 	
 	// ============ MULTI THREADED
 	char num_threads;
-	// TODO: change to a number higher than 1?
-	// TODO: find a better way to determine the number of threads based on the
-	// amount of work
-	if (combined_ft.length <= 8) num_threads = 2;
-	else num_threads = 8;
+	size_t paths_per_thread;
+	long number_of_processors = sysconf(_SC_NPROCESSORS_ONLN);
+	if (number_of_processors < 1) number_of_processors = 1;
+	/* If we divide all the paths among all the cores of the machine and
+	 * that exceeds the minimum number of comparisons each thread must make,
+	 * then use all the cores of the machine and have each do an equal amount
+	 * of work. */
+	if ((combined_ft.length / number_of_processors) \
+		>= MIN_COMPARISONS_PER_THREAD) {
+
+		num_threads = number_of_processors;
+		if (num_threads < 1) num_threads = 1;
+		// + 1 for ceil
+		paths_per_thread = (combined_ft.length / num_threads) + 1;
+	} else {
+		num_threads = combined_ft.length / MIN_COMPARISONS_PER_THREAD;
+		if (num_threads < 1) num_threads = 1;
+		// + 1 for ceil
+		paths_per_thread = (combined_ft.length / num_threads) + 1;
+	}
+	printf("%d thread(s) each comparing at most %ld paths\n", num_threads, paths_per_thread);
 	size_t paths_to_assign = combined_ft.length;
 	size_t paths_assigned = 0;
-	size_t paths_per_thread = paths_to_assign / num_threads;
 	CDTThreadArgs args[num_threads];
 
 	/* Set thread arguments */
@@ -627,15 +641,17 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < comparisons->length; i++) {
 		FullFileComparison *ffc = (FullFileComparison *) comparisons->array[i];
 
-		if (ffc->partial_cmp.first_fm == S_IFDIR \
-			|| ffc->partial_cmp.second_fm == S_IFDIR) {
+		if (flag_print_totals) {
+			if (ffc->partial_cmp.first_fm == S_IFDIR \
+				|| ffc->partial_cmp.second_fm == S_IFDIR) {
 
-			max_num_dir_matches++;
-		}
-		if (ffc->partial_cmp.first_fm == S_IFREG \
-			|| ffc->partial_cmp.second_fm == S_IFREG) {
+				max_num_dir_matches++;
+			}
+			if (ffc->partial_cmp.first_fm == S_IFREG \
+				|| ffc->partial_cmp.second_fm == S_IFREG) {
 
-			max_num_file_matches++;
+				max_num_file_matches++;
+			}
 		}
 
 		switch (ffc->partial_cmp.file_cmp) {
