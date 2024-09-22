@@ -338,7 +338,11 @@ int compare_files(char * first_path, char * second_path) {
 	if (first_file == NULL) return -1;
 	FILE * second_file = fopen(second_path, "r+");
 	if (second_file == NULL) return -1;
-	// TODO: posix_fadvise
+	/* Advise the kernel that we will be reading these two files sequentially.
+	 * This seem to have little to no effect on runtime, but that might be
+	 * because my tests involved only small files. */
+	posix_fadvise(fileno(first_file), 0, 0, 1);
+	posix_fadvise(fileno(second_file), 0, 0, 1);
 	/* Create a buffer of 8192 chars, all initialized to 0(?) */
 	size_t num_bytes = 8192;
 	char *first_buf = calloc(num_bytes, sizeof(char));
