@@ -300,6 +300,72 @@ DynamicArray relative_files_in_tree(String *root, String *extension) {
 }
 
 
+// TODO: update doc from copy paste from cpp
+/** Takes two paths and returns 0 if the files are byte-for-byte identical,
+ * and -1 if they are not. Both file paths must point to regular files and
+ * both regular files must exist.
+ *
+ * \param '&first_path' a file path that points to the first file we wish to
+ *     compare.
+ * \param '&second_path' a file path that points to the second file we wish to
+ *     compare.
+ * \return 0 if they files are byte-for-byte identical, -1 otherwise.
+ */
+int compare_files(char * first_path, char * second_path) {
+	/* {{{ */
+	/* Check if the files differ in size. If they do, they cannot be
+	 * byte-for-byte identical */
+	struct stat first_file_info;
+	struct stat second_file_info;
+
+	if(stat(first_path, &first_file_info) != 0) {
+		/* stat() failed, return -1 */
+		return -1;
+	}
+
+	if(stat(second_path, &second_file_info) != 0) {
+		/* stat() failed, return -1 */
+		return -1;
+	}
+
+	if (first_file_info.st_size != second_file_info.st_size) {
+		return -1;
+	}
+
+	/* Read through both files simultaneously, comparing their bytes. If at any
+	 * point two bytes at the same location in the files differ, return -1 */
+	FILE * first_file = fopen(first_path, "r+");
+	if (first_file == NULL) return -1;
+	FILE * second_file = fopen(second_path, "r+");
+	if (second_file == NULL) return -1;
+	// TODO: posix_fadvise
+	/* Create a buffer of 8192 chars, all initialized to 0(?) */
+	size_t num_bytes = 8192;
+	char *first_buf = calloc(num_bytes, sizeof(char));
+	if (first_buf == NULL) return -1;
+	char *second_buf = calloc(num_bytes, sizeof(char));
+	if (second_buf == NULL) return -1;
+
+	size_t first_nmem_read = 0;
+	size_t second_nmem_read = 0;
+	while(0 < (first_nmem_read = fread(first_buf, sizeof(char), num_bytes, first_file))
+		&& 0 < (second_nmem_read = fread(second_buf, sizeof(char), num_bytes, second_file)) ) {
+
+		/* One file ended before the other */
+		if (first_nmem_read != second_nmem_read) {
+			return -1;
+		}
+
+		if (0 != memcmp(first_buf, second_buf, first_nmem_read)) {
+			return -1;
+		}
+	}
+
+	return 0;
+	/* }}} */
+}
+
+
 /** Returns an unsorted vector list file paths for all the files (in the broad
  * sense of the word, including links and directories, as well as hidden
  * regular files) in a directory tree rooted at the directory pointed to by
@@ -372,45 +438,17 @@ PartialFileComparison compare_path(String *first_path, String *second_path) {
 		ret.file_cmp = MATCH;
 		return ret;
 	} else if (ret.first_fm == S_IFREG) {
-		pid_t child_pid = fork();
-
-		/* If child process... */
-		if (child_pid == 0) {
-			/* Create a file descriptor for /dev/null */
-			int null = open("/dev/null", O_WRONLY);
-			/* Redirect stdout and stderr for the child process to /dev/null
-			 * before 'execlp'ing so that the output from the child process
-			 * does not get mangled in the output from the parent process */
-			dup2(null, STDOUT_FILENO);
-			dup2(null, STDERR_FILENO);
-			/* Execute cmp to compare the two files */
-			execlp("cmp", "cmp", first_path->data, second_path->data, \
-				(char *) NULL);
-
-			/* If this point is reached, the execlp() command failed */
-			fprintf(stderr, "ERROR: cmp call failed\n");
-			exit(-1);
-		/* If parent process... */
+		/* If the file comparison succeeded we know that this means the two
+		 * files are byte-for-byte identical. Return with the comparison
+		 * member set to match */
+		printf("about to compare %s and %s\n", first_path->data, second_path->data);
+		if (compare_files(first_path->data, second_path->data) == 0) {
+			ret.file_cmp = MATCH;
+			return ret;
 		} else {
-			int r;
-			waitpid(child_pid, &r, 0);
-
-			/* If 'cmp' succeeded we know that this means the two files are
-			 * byte-for-byte identical. Return with the comparison member set to
-			 * match */
-			if (r == 0) {
-				ret.file_cmp = MATCH;
-				return ret;
-			}
+			ret.file_cmp = MISMATCH_CONTENT;
+			return ret;
 		}
-
-		/* If we make it to this point, 'cmp' failed and since we handled
-		 * existence status mismatches and file mode/type mismatches earlier,
-		 * we know that if 'cmp' failed, the two  files are NOT byte-for-byte
-		 * identical. Set the match member to reflect that there's a mismatch
-		 * in content. */
-		ret.file_cmp = MISMATCH_CONTENT;
-		return ret;
 	/* TODO: Other file types do not yet have support. At the moment, they are
 	 * treated the same way directories are: if they both exist, and are of
 	 * the same type, return that they match. */
@@ -487,15 +525,9 @@ DynamicArray *compare_directory_trees(String *first_root, \
 		&compare_function_FullFileComparison, \
 		&destroy_function_FullFileComparison);
 
-	// TODO: there should be some multithreading here - we have the full
-	// list of elements we want to compare, divide the list into equal
-	// segments, fork or multithread and have the forks/threads do the
-	// comparisons and then join before outputting the results.
-	//
-	// You can use this opportunity to write a references page for how to
+	// TODO: You can use this opportunity to write a references page for how to
 	// write multithreaded code in C.
 	
-	// ============ MULTI THREADED
 	char num_threads;
 	size_t paths_per_thread;
 	long number_of_processors = sysconf(_SC_NPROCESSORS_ONLN);
@@ -560,22 +592,6 @@ DynamicArray *compare_directory_trees(String *first_root, \
 
 	/* Hack to fix return array */
 	ret->length = combined_ft.length;
-
-	// ============ SINGLE THREADED
-	/* /1* Go through all the files in the combined  file list, create two full */
-	/*  * paths to the file, one rooted at '&first_root', one rooted at */
-	/*  * '&second_root', and compare them *1/ */
-	/* for (int i = 0; i < combined_ft.length; i++) { */
-	/* 	String *first_file = \ */
-	/* 		path_extend(first_root, (String *) combined_ft.array[i]); */
-	/* 	String *second_file = \ */
-	/* 		path_extend(second_root, (String *) combined_ft.array[i]); */
-	/* 	FullFileComparison res; */
-	/* 	res.partial_cmp = compare_path(first_file, second_file); */
-	/* 	duplicate_string(&res.first_path, first_file); */
-	/* 	duplicate_string(&res.second_path, second_file); */
-	/* 	dynamic_array_push(ret, &res); */
-	/* } */
 
 	return ret;
 }
