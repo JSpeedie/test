@@ -49,16 +49,6 @@ struct FullFileComparison {
 }
 
 
-/* Gameplan:
- * DONE! 1. Read commandline args for 2 dirs
- * DONE! 2. Cycle through items in given dirs 
- * DONE! 3. Create a vector of all the items in a given dir and its subdirs
- * DONE! 4. Write function for comparing two files
- * DONE! 5. Write function for comparing two paths
- * DONE! 6. write compare directory tree function
- */
-
-
 /// Returns an unsorted vector list of relative file paths for all files (in the broad sense of the
 /// word, including links and directories, as well as hidden files) in a directory tree rooted at
 /// the directory pointed to by the path `root` / `extension`. The file paths included in the
@@ -414,32 +404,18 @@ fn main() {
         flag_print_totals = true;
     }
 
-    println!("================= files_in_tree():");
-    println!("{:?}", files_in_tree(first_dir));
-    println!("================= compare_regular_files():");
-    println!("{:?} {:?} => {:?}", "test1/matchingfile", "test2/matchingfile",
-        compare_regular_files(Path::new("test1/matchingfile"), Path::new("test2/matchingfile")));
-    println!("{:?} {:?} => {:?}", "test1/subdir/differingfile", "test2/subdir/differingfile",
-        compare_regular_files(Path::new("test1/subdir/differingfile"), Path::new("test2/subdir/differingfile")));
-    println!("{:?} {:?} => {:?}", "test1/filethatdiffersinonebyte", "test2/filethatdiffersinonebyte",
-        compare_regular_files(Path::new("test1/filethatdiffersinonebyte"), Path::new("test2/filethatdiffersinonebyte")));
-    println!("================= compare_files():");
-    println!("{:?} {:?} => {:?}", "test1/matchingfile", "test2/matchingfile",
-        compare_files(Path::new("test1/matchingfile"), Path::new("test2/matchingfile")));
-    println!("{:?} {:?} => {:?}", "test1/subdir/differingfile", "test2/subdir/differingfile",
-        compare_files(Path::new("test1/subdir/differingfile"), Path::new("test2/subdir/differingfile")));
-    println!("{:?} {:?} => {:?}", "test1/filethatdiffersinonebyte", "test2/filethatdiffersinonebyte",
-        compare_files(Path::new("test1/filethatdiffersinonebyte"), Path::new("test2/filethatdiffersinonebyte")));
-    println!("================= compare_directory_trees():");
     match compare_directory_trees(first_dir, second_dir) {
         Ok(list) => {
             for e in list {
                 match e.partial_cmp.file_cmp {
                     FileCmp::Match => {
-                        println!("{:?} == {:?}", e.first_path, e.second_path);
+                        if flag_print_matches {
+                            println!("{:?} == {:?}", e.first_path, e.second_path);
+                        }
                     },
                     FileCmp::TypeMismatch => {
-                        println!("{:?} is not of the same type as {:?}", e.first_path, e.second_path);
+                        println!("{:?} is not of the same type as {:?}", e.first_path,
+                            e.second_path);
                     },
                     FileCmp::ContentMismatch => {
                         println!("{:?} differs from {:?}", e.first_path, e.second_path);
@@ -451,7 +427,8 @@ fn main() {
                         println!("{:?} exists, but {:?} does NOT exist", e.first_path, e.second_path);
                     },
                     FileCmp::OnlySecondFileExists => {
-                        println!("{:?} does NOT exist, but {:?} does exist", e.first_path, e.second_path);
+                        println!("{:?} does NOT exist, but {:?} does exist", e.first_path,
+                            e.second_path);
                     },
                 }
             }
