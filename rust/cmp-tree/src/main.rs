@@ -49,6 +49,19 @@ struct FullFileComparison {
 }
 
 
+/* For printing coloured output */
+const NOTHING: &str = "";
+const BOLD: &str = "\x1B[1m";
+const NORMAL: &str = "\x1B[0m";
+const RED: &str = "\x1B[31m";
+const GREEN: &str = "\x1B[32m";
+const YELLOW: &str = "\x1B[33m";
+const BLUE: &str = "\x1B[34m";
+const MAGENTA: &str = "\x1B[35m";
+const CYAN: &str = "\x1B[36m";
+const WHITE: &str = "\x1B[37m";
+
+
 /// Returns an unsorted vector list of relative file paths for all files (in the broad sense of the
 /// word, including links and directories, as well as hidden files) in a directory tree rooted at
 /// the directory pointed to by the path `root` / `extension`. The file paths included in the
@@ -356,6 +369,7 @@ fn compare_directory_trees(first_root: &Path, second_root: &Path) ->
 fn main() {
     let mut flag_print_totals: bool = false;
     let mut flag_print_matches: bool = false;
+    // TODO: add the -p flag (pretty print) flag implementation
     let mut flag_pretty_output: bool = false;
 
     let match_result = command!()
@@ -466,7 +480,9 @@ fn main() {
                 match e.partial_cmp.file_cmp {
                     FileCmp::Match => {
                         if flag_print_matches {
+                            if flag_pretty_output { print!("{BOLD}{GREEN}"); }
                             println!("{:?} == {:?}", e.first_path, e.second_path);
+                            if flag_pretty_output { print!("{NORMAL}"); }
                         }
                         if e.partial_cmp.first_ft.unwrap().is_file() {
                             num_file_matches += 1;
@@ -475,21 +491,31 @@ fn main() {
                         }
                     },
                     FileCmp::TypeMismatch => {
+                        if flag_pretty_output { print!("{BOLD}{RED}"); }
                         println!("{:?} is not of the same type as {:?}", e.first_path,
                             e.second_path);
+                        if flag_pretty_output { print!("{NORMAL}"); }
                     },
                     FileCmp::ContentMismatch => {
+                        if flag_pretty_output { print!("{BOLD}{RED}"); }
                         println!("{:?} differs from {:?}", e.first_path, e.second_path);
+                        if flag_pretty_output { print!("{NORMAL}"); }
                     },
                     FileCmp::NeitherFileExists => {
+                        if flag_pretty_output { print!("{BOLD}{RED}"); }
                         println!("Neither {:?} nor {:?} exist", e.first_path, e.second_path);
+                        if flag_pretty_output { print!("{NORMAL}"); }
                     },
                     FileCmp::OnlyFirstFileExists => {
+                        if flag_pretty_output { print!("{BOLD}{RED}"); }
                         println!("{:?} exists, but {:?} does NOT exist", e.first_path, e.second_path);
+                        if flag_pretty_output { print!("{NORMAL}"); }
                     },
                     FileCmp::OnlySecondFileExists => {
+                        if flag_pretty_output { print!("{BOLD}{RED}"); }
                         println!("{:?} does NOT exist, but {:?} does exist", e.first_path,
                             e.second_path);
+                        if flag_pretty_output { print!("{NORMAL}"); }
                     },
                 }
             }
@@ -500,7 +526,7 @@ fn main() {
     }
 
     if flag_print_totals {
-        println!("All done!\n");
+        println!("All done!");
         println!("File byte-for-byte matches: {num_file_matches}/{max_num_file_matches}");
         println!("Directory matches: {num_dir_matches}/{max_num_dir_matches}");
     }
