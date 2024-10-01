@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+num_calls=100
+start=$(date +%s.%N)
+
+for i in $(seq $num_calls); do
+	./cmp-tree /home/me/kingston_dup1 /home/me/kingston_dup2 &> /dev/null
+	# diff -qr /home/me/kingston_dup1 /home/me/kingston_dup2 &> /dev/null
+done
+
+end=$(date +%s.%N)
+total_execution_time=$(echo "$end - $start" | bc -l)
+average_execution_time=$(echo "($end - $start) / $num_calls" | bc -l)
+
+echo "$num_calls calls took a total of ${total_execution_time}s"
+echo "On average, each execution took ${average_execution_time}s"
