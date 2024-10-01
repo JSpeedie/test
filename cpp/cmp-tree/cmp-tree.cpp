@@ -145,6 +145,8 @@ int compare_files(fs::path &first_path, fs::path &second_path) {
 	 * point two bytes at the same location in the files differ, return -1 */
 	std::ifstream first_stream(first_path.c_str(), std::ifstream::binary);
 	std::ifstream second_stream(second_path.c_str(), std::ifstream::binary);
+	first_stream.sync_with_stdio(false);
+	second_stream.sync_with_stdio(false);
 	/* Create a buffer of 8192 chars, all initialized to 0(?) */
 	std::vector<char> first_buf(8192, 0);
 	std::vector<char> second_buf(8192, 0);
