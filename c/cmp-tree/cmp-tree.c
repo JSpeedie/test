@@ -447,7 +447,6 @@ PartialFileComparison compare_path(String *first_path, String *second_path) {
 		/* If the file comparison succeeded we know that this means the two
 		 * files are byte-for-byte identical. Return with the comparison
 		 * member set to match */
-		printf("about to compare %s and %s\n", first_path->data, second_path->data);
 		if (compare_files(first_path->data, second_path->data) == 0) {
 			ret.file_cmp = MATCH;
 			return ret;
