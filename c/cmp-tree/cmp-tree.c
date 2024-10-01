@@ -334,33 +334,35 @@ int compare_files(char * first_path, char * second_path) {
 
 	/* Read through both files simultaneously, comparing their bytes. If at any
 	 * point two bytes at the same location in the files differ, return -1 */
-	FILE * first_file = fopen(first_path, "r+");
-	if (first_file == NULL) return -1;
-	FILE * second_file = fopen(second_path, "r+");
-	if (second_file == NULL) return -1;
+	int first_file = open(first_path, O_RDONLY);
+	if (first_file == -1) return -1;
+	int second_file = open(second_path, O_RDONLY);
+	if (second_file == -1) return -1;
 	/* Advise the kernel that we will be reading these two files sequentially.
 	 * This seem to have little to no effect on runtime, but that might be
 	 * because my tests involved only small files. */
-	posix_fadvise(fileno(first_file), 0, 0, 1);
-	posix_fadvise(fileno(second_file), 0, 0, 1);
+	posix_fadvise(first_file, 0, 0, 1);
+	posix_fadvise(second_file, 0, 0, 1);
 	/* Create a buffer of 8192 chars, all initialized to 0(?) */
 	size_t num_bytes = 8192;
-	char *first_buf = calloc(num_bytes, sizeof(char));
+	/* char *first_buf = calloc(num_bytes, sizeof(char)); */
+	char *first_buf = malloc(num_bytes);
 	if (first_buf == NULL) return -1;
-	char *second_buf = calloc(num_bytes, sizeof(char));
+	/* char *second_buf = calloc(num_bytes, sizeof(char)); */
+	char *second_buf = malloc(num_bytes);
 	if (second_buf == NULL) return -1;
 
-	size_t first_nmem_read = 0;
-	size_t second_nmem_read = 0;
-	while(0 < (first_nmem_read = fread(first_buf, sizeof(char), num_bytes, first_file))
-		&& 0 < (second_nmem_read = fread(second_buf, sizeof(char), num_bytes, second_file)) ) {
+	size_t first_bytes_read = 0;
+	size_t second_bytes_read = 0;
+	while(0 < (first_bytes_read = read(first_file, first_buf, num_bytes))
+		&& 0 < (second_bytes_read = read(second_file, second_buf, num_bytes)) ) {
 
 		/* One file ended before the other */
-		if (first_nmem_read != second_nmem_read) {
+		if (first_bytes_read != second_bytes_read) {
 			return -1;
 		}
 
-		if (0 != memcmp(first_buf, second_buf, first_nmem_read)) {
+		if (0 != memcmp(first_buf, second_buf, first_bytes_read)) {
 			return -1;
 		}
 	}
@@ -536,6 +538,17 @@ DynamicArray *compare_directory_trees(String *first_root, \
 	size_t paths_per_thread;
 	long number_of_processors = sysconf(_SC_NPROCESSORS_ONLN);
 	if (number_of_processors < 1) number_of_processors = 1;
+
+	// TODO: maybe what is slowing things down is that even when I limit the
+	// multithreading to 1 thread, this program still does a lot of weird setup
+	// work for that 1 thread that it doesn't have to do... if it's only 1
+	// thread. I should test it back in original single threaded mode to see
+	// what's up. For now though, max-core multithreading gives me a 185->165
+	// millisecond improvement
+
+	// TODO: remove
+	number_of_processors = 1;
+
 	/* If we divide all the paths among all the cores of the machine and
 	 * that exceeds the minimum number of comparisons each thread must make,
 	 * then use all the cores of the machine and have each do an equal amount
