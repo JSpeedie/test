@@ -147,15 +147,13 @@ fn compare_regular_files(first_path: &Path, second_path: &Path) -> Result<RegFil
 
     /* Check if the files differ in size. If they do, they cannot be byte-for-byte identical */
     match first_path.metadata() {
-        Ok(first_md) => {
-            match second_path.metadata() {
-                Ok(second_md) => {
-                    if first_md.len() != second_md.len() {
-                        return Ok(RegFileCmp::DiffLength);
-                    }
-                },
-                Err(_) => return Err(()),
-            }
+        Ok(first_md) => match second_path.metadata() {
+            Ok(second_md) => {
+                if first_md.len() != second_md.len() {
+                    return Ok(RegFileCmp::DiffLength);
+                }
+            },
+            Err(_) => return Err(()),
         },
         Err(_) => return Err(()),
     }
@@ -169,26 +167,24 @@ fn compare_regular_files(first_path: &Path, second_path: &Path) -> Result<RegFil
 
     loop {
         match first_file.read(&mut first_buf) {
-            Ok(first_bytes_read) => {
-                match second_file.read(&mut second_buf) {
-                    Ok(second_bytes_read) => {
-                        /* One file ended before the other */
-                        if first_bytes_read != second_bytes_read {
-                            return Ok(RegFileCmp::DiffLength);
-                        }
-                        /* If both reads read 0 bytes, that means we have hit the end of both files
-                         * and the two files are identical */
-                        if first_bytes_read == 0 && second_bytes_read == 0 {
-                            return Ok(RegFileCmp::Identical);
-                        }
-                        // TODO: is this a (1) functional and a (2) good equivalent for C++ memcmp?
-                        if first_buf != second_buf {
-                            return Ok(RegFileCmp::DiffContents);
-                        }
-                    },
-                    Err(_) => {
-                        return Err(());
+            Ok(first_bytes_read) => match second_file.read(&mut second_buf) {
+                Ok(second_bytes_read) => {
+                    /* One file ended before the other */
+                    if first_bytes_read != second_bytes_read {
+                        return Ok(RegFileCmp::DiffLength);
                     }
+                    /* If both reads read 0 bytes, that means we have hit the end of both files and
+                     * the two files are identical */
+                    if first_bytes_read == 0 && second_bytes_read == 0 {
+                        return Ok(RegFileCmp::Identical);
+                    }
+                    // TODO: is this a (1) functional and a (2) good equivalent for C++ memcmp?
+                    if first_buf != second_buf {
+                        return Ok(RegFileCmp::DiffContents);
+                    }
+                },
+                Err(_) => {
+                    return Err(());
                 }
             },
             Err(_) => {
@@ -404,13 +400,78 @@ fn main() {
         flag_print_totals = true;
     }
 
+    let mut max_num_file_matches: u128 = 0;
+    let mut max_num_dir_matches: u128 = 0;
+    let mut num_file_matches: u128 = 0;
+    let mut num_dir_matches: u128 = 0;
+
     match compare_directory_trees(first_dir, second_dir) {
         Ok(list) => {
             for e in list {
+                if flag_print_totals {
+                    match e.partial_cmp.first_ft {
+                        Some(f_ft) => {
+                            if f_ft.is_dir() {
+                                max_num_dir_matches += 1;
+                            } else {
+                                match e.partial_cmp.second_ft {
+                                    Some(s_ft) => {
+                                        if s_ft.is_dir() {
+                                            max_num_dir_matches += 1;
+                                        }
+                                    },
+                                    None => (),
+                                }
+                            }
+                        },
+                        None => {
+                            match e.partial_cmp.second_ft {
+                                Some(s_ft) => {
+                                    if s_ft.is_dir() {
+                                        max_num_dir_matches += 1;
+                                    }
+                                },
+                                None => (),
+                            }
+                        },
+                    }
+                    match e.partial_cmp.first_ft {
+                        Some(f_ft) => {
+                            if f_ft.is_file() {
+                                max_num_file_matches += 1;
+                            } else {
+                                match e.partial_cmp.second_ft {
+                                    Some(s_ft) => {
+                                        if s_ft.is_file() {
+                                            max_num_file_matches += 1;
+                                        }
+                                    },
+                                    None => (),
+                                }
+                            }
+                        },
+                        None => {
+                            match e.partial_cmp.second_ft {
+                                Some(s_ft) => {
+                                    if s_ft.is_file() {
+                                        max_num_file_matches += 1;
+                                    }
+                                },
+                                None => (),
+                            }
+                        },
+                    }
+                }
+
                 match e.partial_cmp.file_cmp {
                     FileCmp::Match => {
                         if flag_print_matches {
                             println!("{:?} == {:?}", e.first_path, e.second_path);
+                        }
+                        if e.partial_cmp.first_ft.unwrap().is_file() {
+                            num_file_matches += 1;
+                        } else if e.partial_cmp.first_ft.unwrap().is_dir() {
+                            num_dir_matches += 1;
                         }
                     },
                     FileCmp::TypeMismatch => {
@@ -436,5 +497,11 @@ fn main() {
         Err(_) => {
             println!("Error getting the list of comparisons between the two directory trees");
         }
+    }
+
+    if flag_print_totals {
+        println!("All done!\n");
+        println!("File byte-for-byte matches: {num_file_matches}/{max_num_file_matches}");
+        println!("Directory matches: {num_dir_matches}/{max_num_dir_matches}");
     }
 }
