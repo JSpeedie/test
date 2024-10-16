@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+#
+# Takes 2 arguments:
+#
+# 1. A string representing a path to a directory that roots a directory tree
+# 2. Another string representing a path to another directory that roots another
+#    directory tree
+#
+# The script goes through all the files in both directory trees and reports any
+# instances where a file exists in only one of the directory trees or where a
+# file exists in both directory trees but is not byte-for-byte identical.
+#
+# EXAMPLE:
+# {{{
+# Consider the 2 example directories:
+#
+# $ ls -1
+# first-dir
+# second-dir
+#
+# $ tree first-dir
+# first-dir
+# ├── G2ME-Usage.md
+# ├── Home.md
+# ├── images
+# │   ├── G2ME-GUI.png
+# │   └── G2ME-terminal-demo.gif
+# └── Walkthroughs.md
+#
+# $ tree second-dir
+# second-dir
+# ├── G2ME-Usage.md
+# ├── Home.md
+# ├── images
+# │   └── G2ME-GUI.png
+# └── Walkthroughs.md
+#
+# We can see that the second directory tree is missing the
+# 'images/G2ME-terminal-demo.gif' file. Let's also assume that while both
+# directory trees contain 'images 'G2ME-GUI.png' that the one in 'first-dir' is
+# not byte-for-byte identical with the one in 'second-dir'. In this example,
+# this script will inform the caller about how 'images/G2ME-terminal-demo.gif'
+# exists in the directory tree rooted at 'first-dir', but not in the directory
+# tree rooted at 'second-dir' and about how 'images/G2ME-GUI.png' is not
+# byte-for-byte identical between the two directory trees.
+# }}}
+
+
+# Special sequences for colouring output
+red=$'\e[1;31m'
+green=$'\e[1;32m'
+yellow=$'\e[1;33m'
+blue=$'\e[1;34m'
+magenta=$'\e[1;35m'
+cyan=$'\e[1;36m'
+end=$'\e[0m'
+
+# Check the arguments given to the script
+if [[ -n "$1" ]]; then
+	if [[ -e "$1" ]]; then
+		# Strip possible trailing "/"
+		FIRST_DIR=$(echo "$1" | sed "s/\/$//")
+	else
+		echo "Provided first directory does not exist. Exiting..."
+		exit 1
+	fi
+else
+	echo "No arguments provided. Script expects 2 paths to directories. Exiting..."
+	exit 1
+fi
+
+if [[ -n "$2" ]]; then
+	if [[ -e "$2" ]]; then
+		# Strip possible trailing "/"
+		SECOND_DIR=$(echo "$2" | sed "s/\/$//")
+	else
+		echo "Provided second directory does not exist. Exiting..."
+		exit 1
+	fi
+else
+	echo "No second directory provided. Exiting..."
+	exit 1
+fi
+
+# cd into the directory of interest, print the file's name with the name of the
+# starting-point under which it was found removed and remove any empty lines
+# (using '%P\n' prints the directory on which the find call was executed as an
+# empty line which we must remove)
+mapfile -t FIRST_DIR_FILE_LIST < <(cd "$FIRST_DIR" && find -printf '%P\n' | grep -v "^$" | sort)
+mapfile -t SECOND_DIR_FILE_LIST < <(cd "$SECOND_DIR" && find -printf '%P\n' | grep -v "^$" | sort)
+# Create a combined list that contains all unique elements from both lists,
+# sorted.
+# Note: the weird printf command here simply prints each element of the bash
+# array on its own line
+mapfile -t COMBINED_DIR_FILE_LIST < <( (printf '%s\n' "${FIRST_DIR_FILE_LIST[@]}" && printf '%s\n' "${SECOND_DIR_FILE_LIST[@]}") | sort | uniq)
+
+# printf '%s\n' "${COMBINED_DIR_FILE_LIST[@]}"
+# exit 0
+
+let NUM_FILE_MATCHES=0
+let MAX_NUM_FILE_MATCHES=0
+let NUM_DIR_MATCHES=0
+let MAX_NUM_DIR_MATCHES=0
+
+# While we have not yet compared all the files
+for i in ${!COMBINED_DIR_FILE_LIST[@]}; do
+	D1_FILE="${FIRST_DIR}/${COMBINED_DIR_FILE_LIST[$i]}"
+	D2_FILE="${SECOND_DIR}/${COMBINED_DIR_FILE_LIST[$i]}"
+
+	if [ -f "$D1_FILE" ] || [ -f "$D2_FILE" ]; then
+		let MAX_NUM_FILE_MATCHES+=1
+	fi
+	if [ -d "$D1_FILE" ] || [ -d "$D2_FILE" ]; then
+		let MAX_NUM_DIR_MATCHES+=1
+	fi
+
+	# If the current file exists in both directory trees
+	if [ -f "$D1_FILE" ] && [ -f "$D2_FILE" ]; then
+		# If the file as it exists in the first directory tree is byte-for-byte
+		# identical to the file as it exists in the second directory tree
+		if cmp "$D1_FILE" "$D2_FILE" > /dev/null; then
+		# if cmp "$D1_FILE" "$D2_FILE"; then
+			printf "${green}\"${D1_FILE}\" == \"${D2_FILE}\"${end}\n"
+			let NUM_FILE_MATCHES+=1
+		else
+			printf "${bold}${red}\"${D1_FILE}\" differs from \"${D2_FILE}\"${end}\n" >&2
+		fi
+	# TODO: these two 'elif's should maybe be reduced to one 'elif' that simply
+	# checks if the file type of '$D1_FILE' and the file type of '$D2_FILE'
+	# are dissimilar.
+	#
+	# If the current file exists only in the first directory tree
+	elif [ -f "$D1_FILE" ] && [ ! -f "$D2_FILE" ]; then
+		printf "${red}\"${D1_FILE}\" exists, but \"${D2_FILE}\" does NOT exist${end}\n" >&2
+	# If the current file exists only in the second directory tree
+	elif [ ! -f "$D1_FILE" ] && [ -f "$D2_FILE" ]; then
+		printf "${red}\"${D1_FILE}\" exists, but \"${D2_FILE}\" does NOT exist${end}\n" >&2
+	else
+		# If the current file is actually a directory, but the directory exists
+		# in both directory trees
+		if [ -d "$D1_FILE" ] && [ -d "$D2_FILE" ]; then
+			printf "${green}\"${D1_FILE}\" == \"${D2_FILE}\"${end}\n"
+			let NUM_DIR_MATCHES+=1
+		else
+			printf "${red}\"${D1_FILE}\" mismatches \"${D2_FILE}\" in some way. Perhaps one or both of them are neither files nor directories?${end}\n" >&2
+		fi
+	fi
+done
+
+printf "All done!\n"
+printf "File byte-for-byte matches: ${NUM_FILE_MATCHES}/${MAX_NUM_FILE_MATCHES}\n"
+printf "Directory matches: ${NUM_DIR_MATCHES}/${MAX_NUM_DIR_MATCHES}\n"
