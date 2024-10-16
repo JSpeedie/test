@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+num_calls=100
+
+bash_tests() {
+	# {{{
+	echo "Running Bash version of cmp-tree $num_calls times..."
+	start=$(date +%s.%N)
+
+	for i in $(seq $num_calls); do
+		bash/cmp-tree/cmp-tree /home/me/kingston1 /home/me/kingston2 &> /dev/null
+		# diff -qr /home/me/kingston1 /home/me/kingston2 &> /dev/null
+	done
+
+	end=$(date +%s.%N)
+	total_execution_time=$(echo "$end - $start" | bc -l)
+	average_execution_time=$(echo "($end - $start) / $num_calls" | bc -l)
+
+	echo "Bash: $num_calls calls took a total of ${total_execution_time}s"
+	echo "Bash: On average, each execution took ${average_execution_time}s"
+	# }}}
+}
+
+
+cpp_tests() {
+	# {{{
+	echo "Running C++ version of cmp-tree $num_calls times..."
+	start=$(date +%s.%N)
+
+	for i in $(seq $num_calls); do
+		cpp/cmp-tree/cmp-tree /home/me/kingston1 /home/me/kingston2 &> /dev/null
+		# diff -qr /home/me/kingston1 /home/me/kingston2 &> /dev/null
+	done
+
+	end=$(date +%s.%N)
+	total_execution_time=$(echo "$end - $start" | bc -l)
+	average_execution_time=$(echo "($end - $start) / $num_calls" | bc -l)
+
+	echo "C++: $num_calls calls took a total of ${total_execution_time}s"
+	echo "C++: On average, each execution took ${average_execution_time}s"
+	# }}}
+}
+
+
+c_tests() {
+	# {{{
+	echo "Running C version of cmp-tree $num_calls times..."
+	start=$(date +%s.%N)
+
+	for i in $(seq $num_calls); do
+		c/cmp-tree/cmp-tree /home/me/kingston1 /home/me/kingston2 &> /dev/null
+		# diff -qr /home/me/kingston1 /home/me/kingston2 &> /dev/null
+	done
+
+	end=$(date +%s.%N)
+	total_execution_time=$(echo "$end - $start" | bc -l)
+	average_execution_time=$(echo "($end - $start) / $num_calls" | bc -l)
+
+	echo "C: $num_calls calls took a total of ${total_execution_time}s"
+	echo "C: On average, each execution took ${average_execution_time}s"
+	# }}}
+}
+
+
+rust_tests() {
+	# {{{
+	echo "Running Rust version of cmp-tree $num_calls times..."
+	start=$(date +%s.%N)
+
+	for i in $(seq $num_calls); do
+		rust/cmp-tree/target/debug/cmp-tree /home/me/kingston1 /home/me/kingston2 &> /dev/null
+		# diff -qr /home/me/kingston1 /home/me/kingston2 &> /dev/null
+	done
+
+	end=$(date +%s.%N)
+	total_execution_time=$(echo "$end - $start" | bc -l)
+	average_execution_time=$(echo "($end - $start) / $num_calls" | bc -l)
+
+	echo "Rust: $num_calls calls took a total of ${total_execution_time}s"
+	echo "Rust: On average, each execution took ${average_execution_time}s"
+	# }}}
+}
+
+bash_tests
+cpp_tests
+c_tests
+rust_tests
