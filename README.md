@@ -7,8 +7,7 @@ This repo contains multiple different implementations of the same program:
 `tree`, allowing you to compare the full contents of two directories and find
 any disparities.
 
-<details><summary><i>Example (Click to expand)</i></summary>
-
+<details><summary><i>Example (Click to expand)</i></summary>  
 Let's say we're in a directory that itself contains two example directories:
 
 ```bash
@@ -60,6 +59,8 @@ tree rooted at `second-dir` and about how `images/G2ME-GUI.png` is not
 byte-for-byte identical between the two directory trees.
 </details>
 
+&nbsp;
+
 ### Installation and Running
 
 #### Bash
@@ -93,6 +94,8 @@ cargo build
 target/debug/cmp-tree [path-to-first-directory] [path-to-second-directory]
 ```
 
+&nbsp;
+
 ### Motivation
 
 The impetus for this project came from my need to compare one backup of mine
@@ -100,6 +103,8 @@ that had suffered from a filesystem error which I attempted to recover from to
 another backup that had not suffered the error. I wanted to make sure that
 every single file contained on the recovered backup was byte-for-byte identical
 with the corresponding file on the healthy backup.
+
+&nbsp;
 
 ### Why are There Multiple Implementations?
 
@@ -121,6 +126,7 @@ all the files in two directory trees, then simply build the Rust version of
 from this project, then please feel free to read the
 [Project Report](#project-report) below.
 
+&nbsp;
 
 ### Project Report
 
