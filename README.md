@@ -156,3 +156,17 @@ using `memcmp()` represented significant and straight forward performance
 gains. And better still, if it made sense to do so, the benefits of using
 `memcmp()` could also be multiplied by multithreading the program.
 
+At this point, I had C and C++ implementations that were around as fast if not
+faster than `diff -qr`, so what's with the Rust version? Well at the time I was
+very new to Rust and I thought this could be a good introductory project. I
+also wanted to see how the performance would compare between Rust and C/C++.
+The code came together quickly in Rust and when it came to performance testing,
+the Rust version was on par with C and C++ (even though the C version as
+multithreaded!). I had a great time writing the code in Rust. To me, it seemed
+like there were lots of smart decisions that had been made with the structs I
+was using or with the language more generally, and the development went very
+smoothly.
+
+I currently have plans to multithread the Rust version both so I can try
+multithreading in Rust for the first time and so I can make a faster program
+since I do intend to use `cmp-tree` on two ginormous directory trees.
