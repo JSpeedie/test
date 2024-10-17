@@ -7,6 +7,85 @@ This repo contains multiple different implementations of the same program:
 `tree`, allowing you to compare the full contents of two directories and find
 any disparities.
 
+<details><summary><i>Example (Click to expand)</i></summary>
+Consider the 2 example directories:
+
+```bash
+ls -1
+```
+```
+first-dir
+second-dir
+```
+
+```bash
+tree first-dir
+```
+```
+first-dir
+├── G2ME-Usage.md
+├── Home.md
+├── images
+│   ├── G2ME-GUI.png
+│   └── G2ME-terminal-demo.gif
+└── Walkthroughs.md
+```
+
+```bash
+tree second-dir
+```
+```
+second-dir
+├── G2ME-Usage.md
+├── Home.md
+├── images
+│   └── G2ME-GUI.png
+└── Walkthroughs.md
+```
+
+We can see that the second directory tree is missing the
+'images/G2ME-terminal-demo.gif' file. Let's also assume that while both
+directory trees contain 'images 'G2ME-GUI.png' that the one in 'first-dir' is
+not byte-for-byte identical with the one in 'second-dir'. In this example, this
+script will inform the caller about how 'images/G2ME-terminal-demo.gif' exists
+in the directory tree rooted at 'first-dir', but not in the directory tree
+rooted at 'second-dir' and about how 'images/G2ME-GUI.png' is not byte-for-byte
+identical between the two directory trees.
+</details>
+
+### Installation and Running
+
+#### Bash
+
+```bash
+cd bash/cmp-tree
+./cmp-tree [path-to-first-directory] [path-to-second-directory]
+```
+
+#### C
+
+```bash
+cd c/cmp-tree
+make
+./cmp-tree [path-to-first-directory] [path-to-second-directory]
+```
+
+#### C++
+
+```bash
+cd cpp/cmp-tree
+make
+./cmp-tree [path-to-first-directory] [path-to-second-directory]
+```
+
+#### Rust
+
+```bash
+cd rust/cmp-tree
+cargo build
+target/debug/cmp-tree [path-to-first-directory] [path-to-second-directory]
+```
+
 ### Motivation
 
 The impetus for this project came from my need to compare one backup of mine
@@ -32,7 +111,9 @@ simple utility expanded into an opportunity to learn something about:
 If you came here looking only for an executable that will allow you to compare
 all the files in two directory trees, then simply build the Rust version of
 `cmp-tree` and use that. If you want to hear a little more about what I learned
-from this project, then please feel free to read the Project Report below.
+from this project, then please feel free to read the
+[Project Report](#project-report) below.
+
 
 ### Project Report
 
