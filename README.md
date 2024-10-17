@@ -76,9 +76,9 @@ if they were paths, and (4) a hand implementation of merge sort that worked on
 experience first hand some of the frustrations with C that might've motivated
 C++ such as:
 
-1. Having to hand-write implementations for things most programmers do (and
-   maybe should) feel entitled to such as vectors/dynamic arrays, and decent
-   strings.
+1. Having to hand-write implementations for things most programmers feel
+   (perhaps rightfully so) entitled to such as vectors/dynamic arrays, and
+   decent strings.
 2. Proper support for generics so you can write one implementation of your
    dynamic array instead of one for each type of data your dynamic array needs
    to serve as a container for.
@@ -94,5 +94,52 @@ C such as the fact that while you might have to implement something from
 scratch, that implementation is likely bespoke and very well-suited to the
 specific use case. Eventually though (and after lots of debugging), I finally
 completed my C implementation. When I ran the speed tests I once again found
-that it was on par with the Bash implementation in terms of speed! "There's no
-way" I thought.
+that it was on par with the Bash implementation in terms of speed!
+
+I quickly realized that this lack of performance from the C implementation must
+mean that there was something fundamentally off about the design of my
+implementation that must be slowing things down. At this point, both my C++ and
+C implementation would use `opendir()` and `readdir()` to generate a list of
+relative paths representing every file within a directory, including all the
+files in subdirectories. The implementations would then do this again with the
+second directory, combine the two file path lists, sort them, filter them to
+contain only unique entries and then `fork()` -> `exec()` a `cmp` command on
+`[first_directory]/[unique_file_path[i]]` and
+`[second_directory]/[unique_file_path[i]]`. Remembering this, I thought that it
+was possible that calling `fork()` so many times could be a big part of
+problem. After all, it's not free to just duplicate a process. Before making
+any changes though, I also used `perf` to profile the C implementation and I
+found that it was getting a lot of L2 and L3 cache misses. I remembered hearing
+recently that sometimes caches are specific to processes, and so perhaps all
+this forking is slowing things down in more ways than one.
+
+My solution was to implement a quick-and-dirty function that would replace a
+`fork()` -> `exec()` call pair by simply comparing the contents of two files,
+and if at any point it found a difference, exiting and returning a status that
+indicates that the two files are different. My first-draft of this function
+yielded no significant performance gain which surprised me given that there
+should be substantially less overhead - no forking, no commandline argument or
+flag parsing, none of the extra functionality a more complete program like
+`cmp` might have. My first-draft file-comparison function worked by reading a
+set number of bytes from both files, and then looping through those bytes 1 by
+1 and if the byte from one file mismatched the corresponding byte from the
+other file, it exited early. After some quick research, I found that using
+`memcmp()` to compare two sets of bytes was possibly faster. I gave it a go and
+found my program was *substantially* faster. It turns out that on a lot of
+architectures, `memcmp()` has an implementation written efficiently in
+assembly. For example, it could be vectorized for your processor architecture,
+giving it huge speed gains over whatever the compiler was able to do to my
+C/C++ code for comparing bytes. At the time of writing, this switch from
+manually checking each byte to using `memcmp()` represents the biggest speed
+improvement I've found so far.
+
+Before making the switch from manually comparing bytes to using `memcmp()`, I
+also tried multithreading the C implementation to see if that would help. It
+led to modest speed gains, but it also came at the cost of using significantly
+more cores and with cache-miss downsides of its own. Using `memcmp()`
+represented a solution that simply made better use of the underlying hardware.
+If vectorized, the code will make use of hardware capability that was just
+underutilized in other implementations.
+
+
+
