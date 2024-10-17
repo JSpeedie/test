@@ -50,12 +50,12 @@ second-dir
 ```
 
 We can see that the second directory tree is missing the
-'images/G2ME-terminal-demo.gif' file. Let's also assume that while both
-directory trees contain 'images 'G2ME-GUI.png' that the one in 'first-dir' is
-not byte-for-byte identical with the one in 'second-dir'. In this example, this
-script will inform the caller about how 'images/G2ME-terminal-demo.gif' exists
-in the directory tree rooted at 'first-dir', but not in the directory tree
-rooted at 'second-dir' and about how 'images/G2ME-GUI.png' is not byte-for-byte
+`images/G2ME-terminal-demo.gif` file. Let's also assume that while both
+directory trees contain `images/G2ME-GUI.png` that the one in `first-dir` is
+not byte-for-byte identical with the one in `second-dir`. In this example, this
+script will inform the caller about how `images/G2ME-terminal-demo.gif` exists
+in the directory tree rooted at `first-dir`, but not in the directory tree
+rooted at `second-dir` and about how `images/G2ME-GUI.png` is not byte-for-byte
 identical between the two directory trees.
 </details>
 
