@@ -136,10 +136,23 @@ improvement I've found so far.
 Before making the switch from manually comparing bytes to using `memcmp()`, I
 also tried multithreading the C implementation to see if that would help. It
 led to modest speed gains, but it also came at the cost of using significantly
-more cores and with cache-miss downsides of its own. Using `memcmp()`
-represented a solution that simply made better use of the underlying hardware.
-If vectorized, the code will make use of hardware capability that was just
-underutilized in other implementations.
-
-
+more cores and with cache-miss downsides of its own. It seemed to me like
+multithreading the program was a bit of a deal with the devil: your program
+takes less real-world time to finish (on a typical, multicore personal
+computer), but it takes more CPU time per file comparison. In other words,
+running on a very busy server or workstation, it seemed to me like the
+multithreaded version could actually be slower (in real-world time) due to: (1)
+the flat cost of dividing the work and passing it onto threads, (2) the fact
+that on a busy CPU, it may be unlikely that any two threads are both working at
+the same time, and (3) that there may also be more cache misses because
+multiple threads are making non-adjacent, perhaps even distant data accesses.
+Worse still, the multithreaded C implementation (running on my idle laptop) was
+**still** multiple factors slower than `diff -qr`! Using `memcmp()` represented
+a solution that simply made better use of the underlying hardware. If
+vectorized, the code will make use of hardware capability that was just
+underutilized in other implementations. There were no considerations to take
+into account like with the multithreaded version. On a busy CPU or an idle CPU,
+using `memcmp()` represented significant and straight forward performance
+gains. And better still, if it made sense to do so, the benefits of using
+`memcmp()` could also be multiplied by multithreading the program.
 
