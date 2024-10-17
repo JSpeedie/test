@@ -8,7 +8,7 @@ This repo contains multiple different implementations of the same program:
 any disparities.
 
 <details><summary><i>Example (Click to expand)</i></summary>
-Consider the 2 example directories:
+Let's say we're in a directory that itself contains to example directories:
 
 ```bash
 ls -1
@@ -17,6 +17,9 @@ ls -1
 first-dir
 second-dir
 ```
+
+If we look at the directory tree of the first directory we see something like
+this:
 
 ```bash
 tree first-dir
@@ -30,6 +33,9 @@ first-dir
 │   └── G2ME-terminal-demo.gif
 └── Walkthroughs.md
 ```
+
+If we look at the directory tree of the second directory we see something like
+this:
 
 ```bash
 tree second-dir
