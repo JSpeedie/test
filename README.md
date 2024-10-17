@@ -8,7 +8,8 @@ This repo contains multiple different implementations of the same program:
 any disparities.
 
 <details><summary><i>Example (Click to expand)</i></summary>
-Let's say we're in a directory that itself contains to example directories:
+
+Let's say we're in a directory that itself contains two example directories:
 
 ```bash
 ls -1
@@ -52,11 +53,11 @@ second-dir
 We can see that the second directory tree is missing the
 `images/G2ME-terminal-demo.gif` file. Let's also assume that while both
 directory trees contain `images/G2ME-GUI.png` that the one in `first-dir` is
-not byte-for-byte identical with the one in `second-dir`. In this example, this
-script will inform the caller about how `images/G2ME-terminal-demo.gif` exists
-in the directory tree rooted at `first-dir`, but not in the directory tree
-rooted at `second-dir` and about how `images/G2ME-GUI.png` is not byte-for-byte
-identical between the two directory trees.
+not byte-for-byte identical with the one in `second-dir`. In this example,
+`cmp-tree` will inform the caller about how `images/G2ME-terminal-demo.gif`
+exists in the directory tree rooted at `first-dir`, but not in the directory
+tree rooted at `second-dir` and about how `images/G2ME-GUI.png` is not
+byte-for-byte identical between the two directory trees.
 </details>
 
 ### Installation and Running
